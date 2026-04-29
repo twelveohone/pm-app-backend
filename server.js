@@ -193,6 +193,105 @@ async function ensurePmStateConfigs() {
   console.log('Seeded pm_state_configs (TN, MA)');
 }
 
+async function ensureSitesTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sites (
+      id TEXT PRIMARY KEY,
+      station TEXT,
+      site_name TEXT NOT NULL,
+      address TEXT,
+      city TEXT,
+      zip TEXT,
+      county TEXT,
+      region TEXT,
+      primary_phone TEXT,
+      alt_phones TEXT,
+      hours TEXT,
+      state TEXT,
+      workstations INTEGER NOT NULL DEFAULT 0,
+      kiosks INTEGER NOT NULL DEFAULT 0,
+      first_pod_system TEXT,
+      first_kiosk_system TEXT,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+}
+
+/**
+ * Upsert a site row (used by PUT /sites and import-session).
+ * @param {import('pg').PoolClient | import('pg').Pool} q
+ */
+async function upsertSiteRow(q, site) {
+  const id = String(site?.id || '').trim();
+  const site_name = String(site?.site_name || '').trim();
+  if (!id || !site_name) return;
+
+  const station = site.station != null && site.station !== '' ? String(site.station) : null;
+  const address = site.address != null && site.address !== '' ? String(site.address) : null;
+  const city = site.city != null && site.city !== '' ? String(site.city) : null;
+  const zip = site.zip != null && site.zip !== '' ? String(site.zip) : null;
+  const county = site.county != null && site.county !== '' ? String(site.county) : null;
+  const region = site.region != null && site.region !== '' ? String(site.region) : null;
+  const primary_phone = site.primary_phone != null && site.primary_phone !== '' ? String(site.primary_phone) : null;
+  const alt_phones = site.alt_phones != null && site.alt_phones !== '' ? String(site.alt_phones) : null;
+  const hours = site.hours != null && site.hours !== '' ? String(site.hours) : null;
+  const state = site.state != null && site.state !== '' ? String(site.state) : null;
+  const workstations = Math.max(0, Number(site.workstations ?? 0));
+  const kiosks = Math.max(0, Number(site.kiosks ?? 0));
+  const first_pod_system =
+    site.first_pod_system != null && site.first_pod_system !== '' ? String(site.first_pod_system) : null;
+  const first_kiosk_system =
+    site.first_kiosk_system != null && site.first_kiosk_system !== '' ? String(site.first_kiosk_system) : null;
+
+  const created_at = site.created_at ? new Date(site.created_at) : new Date();
+  const updated_at = site.updated_at ? new Date(site.updated_at) : new Date();
+
+  await q.query(
+    `INSERT INTO sites (
+      id, station, site_name, address, city, zip, county, region, primary_phone, alt_phones, hours,
+      state, workstations, kiosks, first_pod_system, first_kiosk_system, created_at, updated_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+    ON CONFLICT (id) DO UPDATE SET
+      station = EXCLUDED.station,
+      site_name = EXCLUDED.site_name,
+      address = EXCLUDED.address,
+      city = EXCLUDED.city,
+      zip = EXCLUDED.zip,
+      county = EXCLUDED.county,
+      region = EXCLUDED.region,
+      primary_phone = EXCLUDED.primary_phone,
+      alt_phones = EXCLUDED.alt_phones,
+      hours = EXCLUDED.hours,
+      state = EXCLUDED.state,
+      workstations = EXCLUDED.workstations,
+      kiosks = EXCLUDED.kiosks,
+      first_pod_system = EXCLUDED.first_pod_system,
+      first_kiosk_system = EXCLUDED.first_kiosk_system,
+      updated_at = EXCLUDED.updated_at`,
+    [
+      id,
+      station,
+      site_name,
+      address,
+      city,
+      zip,
+      county,
+      region,
+      primary_phone,
+      alt_phones,
+      hours,
+      state,
+      workstations,
+      kiosks,
+      first_pod_system,
+      first_kiosk_system,
+      created_at,
+      updated_at,
+    ]
+  );
+}
+
 function authRequired(req, res, next) {
   attachUserFromToken(req);
   if (!REQUIRE_AUTH) return next();
@@ -545,7 +644,7 @@ app.delete('/auth/users/:id', authRequired, adminRequired, async (req, res) => {
 });
 
 async function adminCountTable(tableKey) {
-  const allowed = { users: 'users', pm_sessions: 'pm_sessions', pm_items: 'pm_items' };
+  const allowed = { users: 'users', sites: 'sites', pm_sessions: 'pm_sessions', pm_items: 'pm_items' };
   const table = allowed[tableKey];
   if (!table) return null;
   try {
@@ -558,12 +657,13 @@ async function adminCountTable(tableKey) {
 
 app.get('/auth/admin/stats', authRequired, adminRequired, async (req, res) => {
   try {
-    const [users, pm_sessions, pm_items] = await Promise.all([
+    const [users, sites, pm_sessions, pm_items] = await Promise.all([
       adminCountTable('users'),
+      adminCountTable('sites'),
       adminCountTable('pm_sessions'),
       adminCountTable('pm_items'),
     ]);
-    return res.json({ users, pm_sessions, pm_items });
+    return res.json({ users, sites, pm_sessions, pm_items });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to load stats' });
@@ -692,6 +792,32 @@ app.delete('/state-configs/:code', authRequired, adminRequired, async (req, res)
   }
 });
 
+app.get('/sites', authRequired, async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM sites ORDER BY site_name ASC`);
+    return res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to list sites' });
+  }
+});
+
+app.put('/sites/:id', authRequired, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) {
+    return res.status(400).json({ error: 'id required' });
+  }
+  const body = { ...req.body, id };
+  try {
+    await upsertSiteRow(pool, body);
+    const row = await pool.query(`SELECT * FROM sites WHERE id = $1`, [id]);
+    return res.json(row.rows[0] || null);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to save site' });
+  }
+});
+
 app.get('/admin', (req, res) => {
   res.redirect(302, '/admin.html');
 });
@@ -743,7 +869,7 @@ app.get('/session', authRequired, async (req, res) => {
 });
 
 app.post('/import-session', authRequired, async (req, res) => {
-  const { session, items } = req.body ?? {};
+  const { session, items, site } = req.body ?? {};
 
   if (!session || !session.id) {
     return res.status(400).json({ error: 'Missing session payload' });
@@ -757,6 +883,10 @@ app.post('/import-session', authRequired, async (req, res) => {
 
   try {
     await client.query('BEGIN');
+
+    if (site && site.id && site.site_name) {
+      await upsertSiteRow(client, site);
+    }
 
     await client.query(
       `INSERT INTO pm_sessions (
@@ -899,6 +1029,7 @@ async function start() {
   try {
     await ensureAuthTables();
     await ensurePmStateConfigs();
+    await ensureSitesTable();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

@@ -183,6 +183,7 @@
     const s = await api('/auth/admin/stats', { method: 'GET' });
     $('stats').innerHTML =
       '<div>Users: <strong>' + (s.users ?? '—') + '</strong></div>' +
+      '<div>Sites: <span>' + (s.sites ?? '—') + '</span></div>' +
       '<div>Sessions: <span>' + (s.pm_sessions ?? '—') + '</span></div>' +
       '<div>PM items: <span>' + (s.pm_items ?? '—') + '</span></div>';
   }
