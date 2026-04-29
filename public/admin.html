@@ -29,6 +29,22 @@
     textarea.wide { width: 100%; max-width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: .8rem; min-height: 72px; padding: .5rem; border: 1px solid #ccc; border-radius: 6px; }
     .hint { font-size: .78rem; color: #555; margin: .25rem 0 .5rem; line-height: 1.35; }
     hr.soft { margin: 1rem 0; border: none; border-top: 1px solid #eee; }
+    .device-panel {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #f9fafb;
+      padding: .6rem .75rem;
+      margin: .35rem 0 .75rem;
+      min-height: 2.5rem;
+    }
+    .device-panel table { width: 100%; font-size: .82rem; }
+    .device-panel td, .device-panel th { padding: .35rem .25rem; border-bottom: 1px solid #eee; }
+    .device-panel th { color: #666; font-size: .72rem; text-transform: uppercase; }
+    .device-panel .btn-remove { background: transparent; color: #9a0000; border: none; padding: .2rem .4rem; cursor: pointer; font-size: .8rem; }
+    .device-panel .ws-empty { color: #888; font-size: .85rem; margin: 0; font-style: italic; }
+    .ws-add-row { align-items: flex-end; margin-top: .25rem; }
+    .ws-add-row select { min-width: 200px; }
+    .ws-add-row input { min-width: 180px; max-width: 100%; }
   </style>
 </head>
 <body>
@@ -75,7 +91,7 @@
             <tr>
               <th>Code</th>
               <th>Name</th>
-              <th>Pod #</th>
+              <th>Workstation #</th>
               <th>Kiosk #</th>
               <th></th>
             </tr>
@@ -95,11 +111,33 @@
           <input id="sc-name" style="max-width:100%;" placeholder="Texas" />
         </div>
       </div>
-      <label for="sc-pod">Pod workstation devices (one type per line)</label>
-      <textarea id="sc-pod" class="wide" placeholder="camera_tower&#10;printer"></textarea>
+      <label>Workstation Devices</label>
+      <p class="hint" style="margin-top:0;">List is built from the row below. Each device type can appear once.</p>
+      <div id="sc-workstation-panel" class="device-panel">
+        <p id="ws-empty" class="ws-empty">No workstation devices yet. Add one below.</p>
+        <table id="ws-table" class="hidden" style="width:100%;">
+          <thead>
+            <tr><th>Device</th><th>Model</th><th></th></tr>
+          </thead>
+          <tbody id="ws-tbody"></tbody>
+        </table>
+      </div>
+      <div class="row ws-add-row">
+        <div>
+          <label for="ws-add-device">Device</label>
+          <select id="ws-add-device"><option value="">— Select —</option></select>
+        </div>
+        <div style="flex:1;min-width:160px;">
+          <label for="ws-add-model">Model</label>
+          <input id="ws-add-model" type="text" placeholder="e.g. HP Color LaserJet" autocomplete="off" />
+        </div>
+        <button type="button" id="btn-ws-add">Add device</button>
+      </div>
+
       <label for="sc-kiosk">Kiosk devices (one type per line)</label>
       <textarea id="sc-kiosk" class="wide" placeholder="kiosk"></textarea>
-      <label for="sc-models">Models (JSON object: device type → label)</label>
+      <label for="sc-models">Models for other devices (JSON)</label>
+      <p class="hint" style="margin-top:0;">Usually kiosk device labels. Workstation models are set in the list above.</p>
       <textarea id="sc-models" class="wide" style="min-height:120px;">{}</textarea>
       <div class="row">
         <button type="button" id="btn-state-save">Save</button>
@@ -190,15 +228,68 @@
 
   let cachedStateRows = [];
   let editingStateCode = null;
+  let cachedDeviceTypesList = [];
+  let workstationRows = [];
+
+  function populateWsDeviceSelect() {
+    var sel = $('ws-add-device');
+    if (!sel) return;
+    var used = new Set(workstationRows.map(function (r) { return r.type; }));
+    sel.innerHTML = '<option value="">— Select —</option>';
+    cachedDeviceTypesList.forEach(function (dt) {
+      if (used.has(dt)) return;
+      var opt = document.createElement('option');
+      opt.value = dt;
+      opt.textContent = dt;
+      sel.appendChild(opt);
+    });
+  }
+
+  function renderWorkstationList() {
+    var tbody = $('ws-tbody');
+    var table = $('ws-table');
+    var empty = $('ws-empty');
+    if (!tbody || !table || !empty) return;
+    tbody.innerHTML = '';
+    if (!workstationRows.length) {
+      table.classList.add('hidden');
+      empty.classList.remove('hidden');
+      populateWsDeviceSelect();
+      return;
+    }
+    empty.classList.add('hidden');
+    table.classList.remove('hidden');
+    workstationRows.forEach(function (row, idx) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><code>' + escapeHtml(row.type) + '</code></td>' +
+        '<td>' + escapeHtml(row.model) + '</td>' +
+        '<td><button type="button" class="btn-remove" data-idx="' + idx + '">Remove</button></td>';
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll('.btn-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var i = parseInt(btn.getAttribute('data-idx'), 10);
+        if (!Number.isNaN(i)) {
+          workstationRows.splice(i, 1);
+          renderWorkstationList();
+        }
+      });
+    });
+    populateWsDeviceSelect();
+  }
 
   async function loadDeviceTypesHint() {
     try {
       const res = await fetch('/state-configs/device-types');
       const arr = await res.json();
-      $('device-types-hint').textContent = Array.isArray(arr) ? arr.join(', ') : '';
+      cachedDeviceTypesList = Array.isArray(arr) ? arr : [];
+      $('device-types-hint').textContent = cachedDeviceTypesList.join(', ');
     } catch (e) {
+      cachedDeviceTypesList = [];
       $('device-types-hint').textContent = '';
     }
+    populateWsDeviceSelect();
   }
 
   function clearStateForm() {
@@ -206,9 +297,13 @@
     $('sc-code').value = '';
     $('sc-code').disabled = false;
     $('sc-name').value = '';
-    $('sc-pod').value = '';
+    workstationRows = [];
+    $('ws-add-model').value = '';
+    var wsel = $('ws-add-device');
+    if (wsel) wsel.value = '';
     $('sc-kiosk').value = '';
     $('sc-models').value = '{}';
+    renderWorkstationList();
     $('state-form-title').textContent = 'Add or edit state';
     show($('statecfg-form-err'), '');
   }
@@ -220,9 +315,20 @@
     $('sc-code').value = s.code;
     $('sc-code').disabled = true;
     $('sc-name').value = s.name || '';
-    $('sc-pod').value = (s.pod_devices || []).join('\n');
+    var models = s.models || {};
+    var pod = Array.isArray(s.pod_devices) ? s.pod_devices : [];
+    workstationRows = pod.map(function (dt) {
+      var t = String(dt);
+      return { type: t, model: models[t] != null ? String(models[t]) : '' };
+    });
+    renderWorkstationList();
     $('sc-kiosk').value = (s.kiosk_devices || []).join('\n');
-    $('sc-models').value = JSON.stringify(s.models || {}, null, 2);
+    var podSet = new Set(pod.map(String));
+    var extra = {};
+    Object.keys(models).forEach(function (k) {
+      if (!podSet.has(k)) extra[k] = models[k];
+    });
+    $('sc-models').value = JSON.stringify(extra, null, 2);
     $('state-form-title').textContent = 'Edit state ' + s.code;
     show($('statecfg-form-err'), '');
   }
@@ -403,23 +509,50 @@
 
   $('btn-state-clear').addEventListener('click', clearStateForm);
 
+  $('btn-ws-add').addEventListener('click', function () {
+    var sel = $('ws-add-device');
+    var dt = sel ? sel.value : '';
+    var model = ($('ws-add-model').value || '').trim();
+    if (!dt) {
+      alert('Select a device.');
+      return;
+    }
+    if (workstationRows.some(function (r) { return r.type === dt; })) {
+      alert('That device is already in the list.');
+      return;
+    }
+    workstationRows.push({ type: dt, model: model });
+    $('ws-add-model').value = '';
+    if (sel) sel.value = '';
+    renderWorkstationList();
+  });
+
   $('btn-state-save').addEventListener('click', async function () {
     show($('statecfg-form-err'), '');
     const code = $('sc-code').value.trim().toUpperCase();
     const name = $('sc-name').value.trim();
-    const pod = $('sc-pod').value;
     const kiosk = $('sc-kiosk').value;
-    var models;
+    var extraModels;
     try {
-      models = JSON.parse($('sc-models').value || '{}');
-      if (typeof models !== 'object' || models === null || Array.isArray(models)) {
-        throw new Error('Models must be a JSON object');
+      extraModels = JSON.parse($('sc-models').value || '{}');
+      if (typeof extraModels !== 'object' || extraModels === null || Array.isArray(extraModels)) {
+        throw new Error('Models JSON must be an object');
       }
     } catch (e) {
       show($('statecfg-form-err'), 'Invalid models JSON: ' + (e.message || String(e)));
       return;
     }
-    var payload = { name: name, pod_devices: pod, kiosk_devices: kiosk, models: models };
+    var wsModels = {};
+    workstationRows.forEach(function (r) {
+      wsModels[r.type] = r.model;
+    });
+    var models = Object.assign({}, extraModels, wsModels);
+    var payload = {
+      name: name,
+      pod_devices: workstationRows.map(function (r) { return r.type; }),
+      kiosk_devices: kiosk,
+      models: models,
+    };
     try {
       if (editingStateCode) {
         await api('/state-configs/' + encodeURIComponent(editingStateCode), {
@@ -486,6 +619,8 @@
       panel(true);
     }
   })();
+
+  renderWorkstationList();
 })();
   </script>
 </body>
