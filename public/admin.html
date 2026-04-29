@@ -79,8 +79,8 @@
     <div class="card">
       <strong>State &amp; device configurations</strong>
       <p class="hint">
-        These drive which device types appear for each state in the mobile app (pods and kiosks). Use exact device keys.
-        Allowed keys:
+        These drive which device types appear for each state (workstation pods vs non-workstation / kiosk units). Allowed
+        keys:
       </p>
       <p id="device-types-hint" class="hint" style="font-family:ui-monospace,monospace;"></p>
       <div id="statecfg-list-err" class="err hidden"></div>
@@ -91,7 +91,7 @@
               <th>Code</th>
               <th>Name</th>
               <th>Workstation #</th>
-              <th>Kiosk #</th>
+              <th>Non-WS #</th>
               <th></th>
             </tr>
           </thead>
@@ -136,10 +136,34 @@
         <button type="button" id="btn-ws-add">Add device</button>
       </div>
 
-      <label for="sc-kiosk">Kiosk devices (one type per line)</label>
-      <textarea id="sc-kiosk" class="wide" placeholder="kiosk"></textarea>
-      <label for="sc-models">Models for other devices (JSON)</label>
-      <p class="hint" style="margin-top:0;">Usually kiosk device labels. Workstation models are set in the list above.</p>
+      <label>Non Workstation Devices</label>
+      <p class="hint" style="margin-top:0;">
+        Devices for kiosk / non–workstation units (same naming rules as workstation). Plain-English names become keys
+        (e.g. <strong>Testing Station</strong> → <code>testing_station</code>).
+      </p>
+      <div id="sc-nonws-panel" class="device-panel">
+        <p id="nw-empty" class="ws-empty">No non-workstation devices yet. Add one below.</p>
+        <table id="nw-table" class="hidden" style="width:100%;">
+          <thead>
+            <tr><th>Device</th><th>Model</th><th></th></tr>
+          </thead>
+          <tbody id="nw-tbody"></tbody>
+        </table>
+      </div>
+      <div class="row ws-add-row">
+        <div style="flex:1;min-width:200px;">
+          <label for="nw-add-device">Device</label>
+          <input id="nw-add-device" type="text" placeholder="e.g. Kiosk or testing_station" autocomplete="off" spellcheck="false" />
+        </div>
+        <div style="flex:1;min-width:160px;">
+          <label for="nw-add-model">Model</label>
+          <input id="nw-add-model" type="text" placeholder="e.g. ATS" autocomplete="off" />
+        </div>
+        <button type="button" id="btn-nw-add">Add device</button>
+      </div>
+
+      <label for="sc-models">Additional models (JSON, optional)</label>
+      <p class="hint" style="margin-top:0;">Only if you need model text for device types not listed above.</p>
       <textarea id="sc-models" class="wide" style="min-height:120px;">{}</textarea>
       <div class="row">
         <button type="button" id="btn-state-save">Save</button>
@@ -232,6 +256,7 @@
   let editingStateCode = null;
   let cachedDeviceTypesList = [];
   let workstationRows = [];
+  let nonWorkstationRows = [];
 
   /** Turn friendly text (e.g. "Camera Tower") into canonical key (e.g. camera_tower). */
   function resolveDeviceTypeKey(raw) {
@@ -298,6 +323,38 @@
     });
   }
 
+  function renderNonWorkstationList() {
+    var tbody = $('nw-tbody');
+    var table = $('nw-table');
+    var empty = $('nw-empty');
+    if (!tbody || !table || !empty) return;
+    tbody.innerHTML = '';
+    if (!nonWorkstationRows.length) {
+      table.classList.add('hidden');
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    table.classList.remove('hidden');
+    nonWorkstationRows.forEach(function (row, idx) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><code>' + escapeHtml(row.type) + '</code></td>' +
+        '<td>' + escapeHtml(row.model) + '</td>' +
+        '<td><button type="button" class="btn-remove nw-remove" data-idx="' + idx + '">Remove</button></td>';
+      tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll('.nw-remove').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var i = parseInt(btn.getAttribute('data-idx'), 10);
+        if (!Number.isNaN(i)) {
+          nonWorkstationRows.splice(i, 1);
+          renderNonWorkstationList();
+        }
+      });
+    });
+  }
+
   async function loadDeviceTypesHint() {
     try {
       const res = await fetch('/state-configs/device-types');
@@ -316,12 +373,16 @@
     $('sc-code').disabled = false;
     $('sc-name').value = '';
     workstationRows = [];
+    nonWorkstationRows = [];
     $('ws-add-model').value = '';
     var wdev = $('ws-add-device');
     if (wdev) wdev.value = '';
-    $('sc-kiosk').value = '';
+    $('nw-add-model').value = '';
+    var ndev = $('nw-add-device');
+    if (ndev) ndev.value = '';
     $('sc-models').value = '{}';
     renderWorkstationList();
+    renderNonWorkstationList();
     $('state-form-title').textContent = 'Add or edit state';
     show($('statecfg-form-err'), '');
   }
@@ -340,11 +401,17 @@
       return { type: t, model: models[t] != null ? String(models[t]) : '' };
     });
     renderWorkstationList();
-    $('sc-kiosk').value = (s.kiosk_devices || []).join('\n');
+    var kiosk = Array.isArray(s.kiosk_devices) ? s.kiosk_devices : [];
+    nonWorkstationRows = kiosk.map(function (dt) {
+      var t = String(dt);
+      return { type: t, model: models[t] != null ? String(models[t]) : '' };
+    });
+    renderNonWorkstationList();
     var podSet = new Set(pod.map(String));
+    var kioskSet = new Set(kiosk.map(String));
     var extra = {};
     Object.keys(models).forEach(function (k) {
-      if (!podSet.has(k)) extra[k] = models[k];
+      if (!podSet.has(k) && !kioskSet.has(k)) extra[k] = models[k];
     });
     $('sc-models').value = JSON.stringify(extra, null, 2);
     $('state-form-title').textContent = 'Edit state ' + s.code;
@@ -537,7 +604,11 @@
       return;
     }
     if (workstationRows.some(function (r) { return r.type === dt; })) {
-      alert('That device is already in the list.');
+      alert('That device is already in the workstation list.');
+      return;
+    }
+    if (nonWorkstationRows.some(function (r) { return r.type === dt; })) {
+      alert('That device is already under Non Workstation Devices. Remove it there first if you meant to move it.');
       return;
     }
     workstationRows.push({ type: dt, model: model });
@@ -546,11 +617,33 @@
     renderWorkstationList();
   });
 
+  $('btn-nw-add').addEventListener('click', function () {
+    var devIn = $('nw-add-device');
+    var raw = devIn && devIn.value ? devIn.value : '';
+    var dt = resolveDeviceTypeKey(raw);
+    var model = ($('nw-add-model').value || '').trim();
+    if (!dt) {
+      alert('Enter a device type (see allowed keys above).');
+      return;
+    }
+    if (nonWorkstationRows.some(function (r) { return r.type === dt; })) {
+      alert('That device is already in the non-workstation list.');
+      return;
+    }
+    if (workstationRows.some(function (r) { return r.type === dt; })) {
+      alert('That device is already under Workstation Devices. Remove it there first if you meant to move it.');
+      return;
+    }
+    nonWorkstationRows.push({ type: dt, model: model });
+    $('nw-add-model').value = '';
+    if (devIn) devIn.value = '';
+    renderNonWorkstationList();
+  });
+
   $('btn-state-save').addEventListener('click', async function () {
     show($('statecfg-form-err'), '');
     const code = $('sc-code').value.trim().toUpperCase();
     const name = $('sc-name').value.trim();
-    const kiosk = $('sc-kiosk').value;
     var extraModels;
     try {
       extraModels = JSON.parse($('sc-models').value || '{}');
@@ -561,15 +654,19 @@
       show($('statecfg-form-err'), 'Invalid models JSON: ' + (e.message || String(e)));
       return;
     }
+    var nwModels = {};
+    nonWorkstationRows.forEach(function (r) {
+      nwModels[r.type] = r.model;
+    });
     var wsModels = {};
     workstationRows.forEach(function (r) {
       wsModels[r.type] = r.model;
     });
-    var models = Object.assign({}, extraModels, wsModels);
+    var models = Object.assign({}, extraModels, nwModels, wsModels);
     var payload = {
       name: name,
       pod_devices: workstationRows.map(function (r) { return r.type; }),
-      kiosk_devices: kiosk,
+      kiosk_devices: nonWorkstationRows.map(function (r) { return r.type; }),
       models: models,
     };
     try {
@@ -640,6 +737,7 @@
   })();
 
   renderWorkstationList();
+  renderNonWorkstationList();
 })();
   </script>
 </body>
