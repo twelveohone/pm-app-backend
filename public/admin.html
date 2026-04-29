@@ -43,8 +43,7 @@
     .device-panel .btn-remove { background: transparent; color: #9a0000; border: none; padding: .2rem .4rem; cursor: pointer; font-size: .8rem; }
     .device-panel .ws-empty { color: #888; font-size: .85rem; margin: 0; font-style: italic; }
     .ws-add-row { align-items: flex-end; margin-top: .25rem; }
-    .ws-add-row select { min-width: 200px; }
-    .ws-add-row input { min-width: 180px; max-width: 100%; }
+    .ws-add-row input[type="text"] { min-width: 160px; max-width: 100%; }
   </style>
 </head>
 <body>
@@ -123,9 +122,9 @@
         </table>
       </div>
       <div class="row ws-add-row">
-        <div>
+        <div style="flex:1;min-width:200px;">
           <label for="ws-add-device">Device</label>
-          <select id="ws-add-device"><option value="">— Select —</option></select>
+          <input id="ws-add-device" type="text" placeholder="e.g. camera_tower" autocomplete="off" spellcheck="false" />
         </div>
         <div style="flex:1;min-width:160px;">
           <label for="ws-add-model">Model</label>
@@ -231,20 +230,6 @@
   let cachedDeviceTypesList = [];
   let workstationRows = [];
 
-  function populateWsDeviceSelect() {
-    var sel = $('ws-add-device');
-    if (!sel) return;
-    var used = new Set(workstationRows.map(function (r) { return r.type; }));
-    sel.innerHTML = '<option value="">— Select —</option>';
-    cachedDeviceTypesList.forEach(function (dt) {
-      if (used.has(dt)) return;
-      var opt = document.createElement('option');
-      opt.value = dt;
-      opt.textContent = dt;
-      sel.appendChild(opt);
-    });
-  }
-
   function renderWorkstationList() {
     var tbody = $('ws-tbody');
     var table = $('ws-table');
@@ -254,7 +239,6 @@
     if (!workstationRows.length) {
       table.classList.add('hidden');
       empty.classList.remove('hidden');
-      populateWsDeviceSelect();
       return;
     }
     empty.classList.add('hidden');
@@ -276,7 +260,6 @@
         }
       });
     });
-    populateWsDeviceSelect();
   }
 
   async function loadDeviceTypesHint() {
@@ -289,7 +272,6 @@
       cachedDeviceTypesList = [];
       $('device-types-hint').textContent = '';
     }
-    populateWsDeviceSelect();
   }
 
   function clearStateForm() {
@@ -299,8 +281,8 @@
     $('sc-name').value = '';
     workstationRows = [];
     $('ws-add-model').value = '';
-    var wsel = $('ws-add-device');
-    if (wsel) wsel.value = '';
+    var wdev = $('ws-add-device');
+    if (wdev) wdev.value = '';
     $('sc-kiosk').value = '';
     $('sc-models').value = '{}';
     renderWorkstationList();
@@ -510,11 +492,11 @@
   $('btn-state-clear').addEventListener('click', clearStateForm);
 
   $('btn-ws-add').addEventListener('click', function () {
-    var sel = $('ws-add-device');
-    var dt = sel ? sel.value : '';
+    var devIn = $('ws-add-device');
+    var dt = (devIn && devIn.value ? devIn.value : '').trim();
     var model = ($('ws-add-model').value || '').trim();
     if (!dt) {
-      alert('Select a device.');
+      alert('Enter a device type (see allowed keys above).');
       return;
     }
     if (workstationRows.some(function (r) { return r.type === dt; })) {
@@ -523,7 +505,7 @@
     }
     workstationRows.push({ type: dt, model: model });
     $('ws-add-model').value = '';
-    if (sel) sel.value = '';
+    if (devIn) devIn.value = '';
     renderWorkstationList();
   });
 
