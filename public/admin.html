@@ -44,6 +44,35 @@
     .device-panel .ws-empty { color: #888; font-size: .85rem; margin: 0; font-style: italic; }
     .ws-add-row { align-items: flex-end; margin-top: .25rem; }
     .ws-add-row input[type="text"] { min-width: 160px; max-width: 100%; }
+    .admin-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .35rem;
+      margin: 0 0 1rem;
+      padding: 0;
+      list-style: none;
+      border-bottom: 1px solid #d8dbe0;
+    }
+    .admin-nav-item {
+      background: #e8eaed;
+      color: #333;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      padding: .5rem 1rem;
+      cursor: pointer;
+      font-size: .92rem;
+      margin-bottom: -1px;
+    }
+    .admin-nav-item:hover { filter: brightness(0.97); }
+    .admin-nav-item.active {
+      background: #fff;
+      border-color: #d8dbe0;
+      border-bottom-color: #fff;
+      color: #1a5fb4;
+      font-weight: 600;
+    }
+    .admin-view { margin-bottom: .5rem; }
   </style>
 </head>
 <body>
@@ -70,12 +99,60 @@
       <button type="button" class="secondary" id="btn-logout">Sign out</button>
     </div>
 
+    <nav class="admin-nav" role="tablist" aria-label="Admin areas">
+      <button type="button" class="admin-nav-item active" data-admin-view="overview" role="tab" aria-selected="true" id="tab-overview">
+        Overview
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-view="users" role="tab" aria-selected="false" id="tab-users">
+        Users
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-view="states" role="tab" aria-selected="false" id="tab-states">
+        State &amp; devices
+      </button>
+    </nav>
+
+    <div id="admin-view-overview" class="admin-view" role="tabpanel" aria-labelledby="tab-overview">
     <div class="card">
       <strong>Database summary</strong>
       <div id="stats" class="stats" style="margin-top:.5rem;"></div>
       <div id="stats-err" class="err hidden"></div>
     </div>
+    </div>
 
+    <div id="admin-view-users" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-users">
+    <div class="card">
+      <strong>Users</strong>
+      <div id="users-err" class="err hidden"></div>
+      <div style="overflow-x:auto;margin-top:.75rem;">
+        <table>
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong>Create user</strong>
+      <div class="row" style="margin-top:.75rem;">
+        <div><label>Name</label><input id="nu-name" /></div>
+        <div><label>Email</label><input id="nu-email" type="email" /></div>
+        <div><label>Password</label><input id="nu-pass" type="password" /></div>
+        <div><label>Role</label><select id="nu-role"><option value="tech">tech</option><option value="manager">manager</option><option value="admin">admin</option></select></div>
+        <button type="button" id="btn-create">Create</button>
+      </div>
+      <div id="create-err" class="err hidden"></div>
+    </div>
+    </div>
+
+    <div id="admin-view-states" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-states">
     <div class="card">
       <strong>State &amp; device configurations</strong>
       <p class="hint">
@@ -168,36 +245,6 @@
       </div>
       <div id="statecfg-form-err" class="err hidden"></div>
     </div>
-
-    <div class="card">
-      <strong>Users</strong>
-      <div id="users-err" class="err hidden"></div>
-      <div style="overflow-x:auto;margin-top:.75rem;">
-        <table>
-          <thead>
-            <tr>
-              <th>Email</th>
-              <th>Name</th>
-              <th>Role</th>
-              <th>Active</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="users-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="card">
-      <strong>Create user</strong>
-      <div class="row" style="margin-top:.75rem;">
-        <div><label>Name</label><input id="nu-name" /></div>
-        <div><label>Email</label><input id="nu-email" type="email" /></div>
-        <div><label>Password</label><input id="nu-pass" type="password" /></div>
-        <div><label>Role</label><select id="nu-role"><option value="tech">tech</option><option value="manager">manager</option><option value="admin">admin</option></select></div>
-        <button type="button" id="btn-create">Create</button>
-      </div>
-      <div id="create-err" class="err hidden"></div>
     </div>
   </div>
 
@@ -238,6 +285,37 @@
     $('login-panel').classList.toggle('hidden', !login);
     $('app-panel').classList.toggle('hidden', login);
   }
+
+  function showAdminView(view) {
+    var v = view === 'users' || view === 'states' ? view : 'overview';
+    var showId =
+      v === 'users' ? 'admin-view-users' : v === 'states' ? 'admin-view-states' : 'admin-view-overview';
+    ['admin-view-overview', 'admin-view-users', 'admin-view-states'].forEach(function (id) {
+      var el = $(id);
+      if (el) el.classList.toggle('hidden', id !== showId);
+    });
+    document.querySelectorAll('.admin-nav-item').forEach(function (btn) {
+      var on = (btn.getAttribute('data-admin-view') || '') === v;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    try {
+      history.replaceState(null, '', v === 'overview' ? '#overview' : '#' + v);
+    } catch (e) {}
+  }
+
+  function initAdminViewFromHash() {
+    var raw = (location.hash || '').replace(/^#/, '').toLowerCase();
+    if (raw === 'users' || raw === 'states' || raw === 'overview') showAdminView(raw);
+    else showAdminView('overview');
+  }
+
+  document.querySelectorAll('.admin-nav-item').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      showAdminView(btn.getAttribute('data-admin-view') || 'overview');
+    });
+  });
+  window.addEventListener('hashchange', initAdminViewFromHash);
 
   async function refreshStats() {
     show($('stats-err'), '');
@@ -561,6 +639,7 @@
         await refreshUsers();
         await refreshStates();
         loadDeviceTypesHint();
+        initAdminViewFromHash();
       } catch (err) {
         sessionStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(ADMIN_ID_KEY);
@@ -708,6 +787,7 @@
       await refreshUsers();
       await refreshStates();
       loadDeviceTypesHint();
+      initAdminViewFromHash();
     } catch (e) {
       sessionStorage.removeItem(TOKEN_KEY);
       sessionStorage.removeItem(ADMIN_ID_KEY);
