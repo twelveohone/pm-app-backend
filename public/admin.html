@@ -26,6 +26,9 @@
     th { font-size: .75rem; text-transform: uppercase; color: #666; }
     .hidden { display: none !important; }
     .toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
+    textarea.wide { width: 100%; max-width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: .8rem; min-height: 72px; padding: .5rem; border: 1px solid #ccc; border-radius: 6px; }
+    .hint { font-size: .78rem; color: #555; margin: .25rem 0 .5rem; line-height: 1.35; }
+    hr.soft { margin: 1rem 0; border: none; border-top: 1px solid #eee; }
   </style>
 </head>
 <body>
@@ -56,6 +59,53 @@
       <strong>Database summary</strong>
       <div id="stats" class="stats" style="margin-top:.5rem;"></div>
       <div id="stats-err" class="err hidden"></div>
+    </div>
+
+    <div class="card">
+      <strong>State &amp; device configurations</strong>
+      <p class="hint">
+        These drive which device types appear for each state in the mobile app (pods and kiosks). Use exact device keys.
+        Allowed keys:
+      </p>
+      <p id="device-types-hint" class="hint" style="font-family:ui-monospace,monospace;"></p>
+      <div id="statecfg-list-err" class="err hidden"></div>
+      <div style="overflow-x:auto;margin-top:.5rem;">
+        <table>
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Pod #</th>
+              <th>Kiosk #</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="states-body"></tbody>
+        </table>
+      </div>
+      <hr class="soft" />
+      <strong id="state-form-title">Add or edit state</strong>
+      <div class="row" style="margin-top:.5rem;">
+        <div>
+          <label for="sc-code">Code</label>
+          <input id="sc-code" maxlength="10" style="text-transform:uppercase" placeholder="TX" />
+        </div>
+        <div style="flex:1;min-width:220px;">
+          <label for="sc-name">Display name</label>
+          <input id="sc-name" style="max-width:100%;" placeholder="Texas" />
+        </div>
+      </div>
+      <label for="sc-pod">Pod workstation devices (one type per line)</label>
+      <textarea id="sc-pod" class="wide" placeholder="camera_tower&#10;printer"></textarea>
+      <label for="sc-kiosk">Kiosk devices (one type per line)</label>
+      <textarea id="sc-kiosk" class="wide" placeholder="kiosk"></textarea>
+      <label for="sc-models">Models (JSON object: device type → label)</label>
+      <textarea id="sc-models" class="wide" style="min-height:120px;">{}</textarea>
+      <div class="row">
+        <button type="button" id="btn-state-save">Save</button>
+        <button type="button" class="secondary" id="btn-state-clear">Clear form</button>
+      </div>
+      <div id="statecfg-form-err" class="err hidden"></div>
     </div>
 
     <div class="card">
@@ -135,6 +185,96 @@
       '<div>Users: <strong>' + (s.users ?? '—') + '</strong></div>' +
       '<div>Sessions: <span>' + (s.pm_sessions ?? '—') + '</span></div>' +
       '<div>PM items: <span>' + (s.pm_items ?? '—') + '</span></div>';
+  }
+
+  let cachedStateRows = [];
+  let editingStateCode = null;
+
+  async function loadDeviceTypesHint() {
+    try {
+      const res = await fetch('/state-configs/device-types');
+      const arr = await res.json();
+      $('device-types-hint').textContent = Array.isArray(arr) ? arr.join(', ') : '';
+    } catch (e) {
+      $('device-types-hint').textContent = '';
+    }
+  }
+
+  function clearStateForm() {
+    editingStateCode = null;
+    $('sc-code').value = '';
+    $('sc-code').disabled = false;
+    $('sc-name').value = '';
+    $('sc-pod').value = '';
+    $('sc-kiosk').value = '';
+    $('sc-models').value = '{}';
+    $('state-form-title').textContent = 'Add or edit state';
+    show($('statecfg-form-err'), '');
+  }
+
+  function beginEditState(code) {
+    const s = cachedStateRows.find(function (x) { return x.code === code; });
+    if (!s) return;
+    editingStateCode = s.code;
+    $('sc-code').value = s.code;
+    $('sc-code').disabled = true;
+    $('sc-name').value = s.name || '';
+    $('sc-pod').value = (s.pod_devices || []).join('\n');
+    $('sc-kiosk').value = (s.kiosk_devices || []).join('\n');
+    $('sc-models').value = JSON.stringify(s.models || {}, null, 2);
+    $('state-form-title').textContent = 'Edit state ' + s.code;
+    show($('statecfg-form-err'), '');
+  }
+
+  async function refreshStates() {
+    show($('statecfg-list-err'), '');
+    const tbody = $('states-body');
+    tbody.innerHTML = '';
+    try {
+      const res = await fetch('/state-configs');
+      if (!res.ok) throw new Error('Failed to load state configs');
+      const rows = await res.json();
+      cachedStateRows = Array.isArray(rows) ? rows : [];
+      for (const s of cachedStateRows) {
+        const tr = document.createElement('tr');
+        var podN = Array.isArray(s.pod_devices) ? s.pod_devices.length : 0;
+        var kN = Array.isArray(s.kiosk_devices) ? s.kiosk_devices.length : 0;
+        tr.innerHTML =
+          '<td><code>' + escapeHtml(s.code) + '</code></td>' +
+          '<td>' + escapeHtml(s.name) + '</td>' +
+          '<td>' + podN + '</td><td>' + kN + '</td>' +
+          '<td><div class="act-btns">' +
+          '<button type="button" class="secondary btn-state-edit" data-code="' + escapeHtml(s.code) + '">Edit</button>' +
+          '<button type="button" class="danger btn-state-del" data-code="' + escapeHtml(s.code) + '">Delete</button>' +
+          '</div></td>';
+        tbody.appendChild(tr);
+      }
+      tbody.querySelectorAll('.btn-state-edit').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          beginEditState(btn.getAttribute('data-code'));
+        });
+      });
+      tbody.querySelectorAll('.btn-state-del').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          deleteState(btn.getAttribute('data-code'));
+        });
+      });
+    } catch (e) {
+      show($('statecfg-list-err'), e.message);
+    }
+  }
+
+  async function deleteState(code) {
+    if (!code) return;
+    if (!window.confirm('Delete state ' + code + '? You cannot remove the last state.')) return;
+    try {
+      await api('/state-configs/' + encodeURIComponent(code), { method: 'DELETE' });
+      if (editingStateCode === code) clearStateForm();
+      await refreshStates();
+    } catch (e) {
+      alert(e.message);
+      await refreshStates();
+    }
   }
 
   async function refreshUsers() {
@@ -238,6 +378,8 @@
       try {
         await refreshStats();
         await refreshUsers();
+        await refreshStates();
+        loadDeviceTypesHint();
       } catch (err) {
         sessionStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(ADMIN_ID_KEY);
@@ -256,6 +398,48 @@
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(ADMIN_ID_KEY);
     panel(true);
+  });
+
+  $('btn-state-clear').addEventListener('click', clearStateForm);
+
+  $('btn-state-save').addEventListener('click', async function () {
+    show($('statecfg-form-err'), '');
+    const code = $('sc-code').value.trim().toUpperCase();
+    const name = $('sc-name').value.trim();
+    const pod = $('sc-pod').value;
+    const kiosk = $('sc-kiosk').value;
+    var models;
+    try {
+      models = JSON.parse($('sc-models').value || '{}');
+      if (typeof models !== 'object' || models === null || Array.isArray(models)) {
+        throw new Error('Models must be a JSON object');
+      }
+    } catch (e) {
+      show($('statecfg-form-err'), 'Invalid models JSON: ' + (e.message || String(e)));
+      return;
+    }
+    var payload = { name: name, pod_devices: pod, kiosk_devices: kiosk, models: models };
+    try {
+      if (editingStateCode) {
+        await api('/state-configs/' + encodeURIComponent(editingStateCode), {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+      } else {
+        if (!code) {
+          show($('statecfg-form-err'), 'Code is required for a new state');
+          return;
+        }
+        await api('/state-configs', {
+          method: 'POST',
+          body: JSON.stringify(Object.assign({ code: code }, payload)),
+        });
+      }
+      clearStateForm();
+      await refreshStates();
+    } catch (e) {
+      show($('statecfg-form-err'), e.message);
+    }
   });
 
   $('btn-create').addEventListener('click', async function () {
@@ -293,6 +477,8 @@
       }
       await refreshStats();
       await refreshUsers();
+      await refreshStates();
+      loadDeviceTypesHint();
     } catch (e) {
       sessionStorage.removeItem(TOKEN_KEY);
       sessionStorage.removeItem(ADMIN_ID_KEY);

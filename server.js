@@ -45,6 +45,154 @@ const poolConfig = DATABASE_URL
     };
 const pool = new Pool(poolConfig);
 
+const PM_DEVICE_TYPES = new Set([
+  'printer',
+  'camera_tower',
+  'scanner',
+  'signature_pad',
+  'ups',
+  'handheld_scanner',
+  'kiosk',
+  'agent_facing_monitor',
+  'passport_scanner',
+  'card_scanner',
+  'document_scanner',
+  'customer_monitor',
+  'vision_tester',
+  'topaz',
+  'testing_station',
+  'payment_device',
+]);
+
+/** Default TN + MA configs (matches PM-App-Expanded config/states.ts). */
+const SEED_PM_STATE_CONFIGS = [
+  {
+    code: 'TN',
+    name: 'Tennessee',
+    pod_devices: [
+      'camera_tower',
+      'signature_pad',
+      'scanner',
+      'handheld_scanner',
+      'ups',
+      'printer',
+    ],
+    kiosk_devices: ['kiosk', 'handheld_scanner', 'ups'],
+    models: {
+      printer: 'HP Color Laserjet Pro 4201DW',
+      camera_tower: 'Canon T7 Camera Tower',
+      scanner: 'Canon ImageFormula DR-C240',
+      signature_pad: 'Verifone M400',
+      ups: 'APC Model BR1000MB',
+      handheld_scanner: 'Zebra Model DS8108',
+      kiosk: '',
+      agent_facing_monitor: '',
+      passport_scanner: '',
+      card_scanner: '',
+      document_scanner: '',
+      customer_monitor: '',
+      vision_tester: '',
+      topaz: '',
+      testing_station: '',
+      payment_device: '',
+    },
+  },
+  {
+    code: 'MA',
+    name: 'Massachusetts',
+    pod_devices: [
+      'agent_facing_monitor',
+      'passport_scanner',
+      'card_scanner',
+      'payment_device',
+      'document_scanner',
+      'customer_monitor',
+      'camera_tower',
+      'vision_tester',
+      'signature_pad',
+      'printer',
+    ],
+    kiosk_devices: ['testing_station'],
+    models: {
+      printer: 'Lexmark MS631 Printer',
+      camera_tower: 'T7 Camera Tower',
+      scanner: '',
+      signature_pad: 'Topaz',
+      ups: '',
+      handheld_scanner: '',
+      kiosk: '',
+      agent_facing_monitor: 'Agent Facing Monitor',
+      passport_scanner: 'B5000',
+      card_scanner: 'M500',
+      document_scanner: 'Ricoh 8170',
+      customer_monitor: 'Customer Monitor',
+      vision_tester: 'Vision Tester',
+      topaz: '',
+      testing_station: 'ATS',
+      payment_device: 'Verifone M400',
+    },
+  },
+];
+
+function coerceDeviceList(value) {
+  if (Array.isArray(value)) {
+    return value.map((x) => String(x).trim()).filter((x) => PM_DEVICE_TYPES.has(x));
+  }
+  if (typeof value === 'string') {
+    const out = [];
+    const seen = new Set();
+    for (const line of value.split(/\r?\n/)) {
+      for (const part of line.split(',')) {
+        const d = part.trim();
+        if (!d || !PM_DEVICE_TYPES.has(d) || seen.has(d)) continue;
+        seen.add(d);
+        out.push(d);
+      }
+    }
+    return out;
+  }
+  return [];
+}
+
+function coerceModels(raw) {
+  const out = {};
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw)) {
+      if (PM_DEVICE_TYPES.has(k)) out[k] = String(v ?? '');
+    }
+  }
+  return out;
+}
+
+async function ensurePmStateConfigs() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pm_state_configs (
+      code TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      pod_devices JSONB NOT NULL DEFAULT '[]'::jsonb,
+      kiosk_devices JSONB NOT NULL DEFAULT '[]'::jsonb,
+      models JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  const cnt = await pool.query(`SELECT COUNT(*)::int AS c FROM pm_state_configs`);
+  if (Number(cnt.rows[0].c) > 0) return;
+  for (const row of SEED_PM_STATE_CONFIGS) {
+    await pool.query(
+      `INSERT INTO pm_state_configs (code, name, pod_devices, kiosk_devices, models, updated_at)
+       VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, NOW())`,
+      [
+        row.code,
+        row.name,
+        JSON.stringify(row.pod_devices),
+        JSON.stringify(row.kiosk_devices),
+        JSON.stringify(row.models),
+      ]
+    );
+  }
+  console.log('Seeded pm_state_configs (TN, MA)');
+}
+
 function authRequired(req, res, next) {
   attachUserFromToken(req);
   if (!REQUIRE_AUTH) return next();
@@ -422,6 +570,128 @@ app.get('/auth/admin/stats', authRequired, adminRequired, async (req, res) => {
   }
 });
 
+app.get('/state-configs', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT code, name, pod_devices, kiosk_devices, models, updated_at
+       FROM pm_state_configs
+       ORDER BY name ASC`
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load state configs' });
+  }
+});
+
+app.get('/state-configs/device-types', (req, res) => {
+  return res.json([...PM_DEVICE_TYPES].sort());
+});
+
+app.post('/state-configs', authRequired, adminRequired, async (req, res) => {
+  const code = String(req.body?.code || '')
+    .trim()
+    .toUpperCase();
+  const name = String(req.body?.name || '').trim();
+  const pod_devices = coerceDeviceList(req.body?.pod_devices);
+  const kiosk_devices = coerceDeviceList(req.body?.kiosk_devices);
+  const models = coerceModels(req.body?.models);
+
+  if (!code || !/^[A-Z0-9]{2,10}$/.test(code)) {
+    return res.status(400).json({ error: 'code must be 2-10 letters or digits' });
+  }
+  if (!name) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  if (pod_devices.length === 0) {
+    return res.status(400).json({ error: 'pod_devices must include at least one valid device type' });
+  }
+
+  try {
+    await pool.query(
+      `INSERT INTO pm_state_configs (code, name, pod_devices, kiosk_devices, models, updated_at)
+       VALUES ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, NOW())`,
+      [code, name, JSON.stringify(pod_devices), JSON.stringify(kiosk_devices), JSON.stringify(models)]
+    );
+    const row = await pool.query(
+      `SELECT code, name, pod_devices, kiosk_devices, models, updated_at
+       FROM pm_state_configs WHERE code = $1`,
+      [code]
+    );
+    return res.status(201).json(row.rows[0]);
+  } catch (err) {
+    if (String(err?.code) === '23505') {
+      return res.status(409).json({ error: 'State code already exists' });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to create state config' });
+  }
+});
+
+app.put('/state-configs/:code', authRequired, adminRequired, async (req, res) => {
+  const code = String(req.params.code || '')
+    .trim()
+    .toUpperCase();
+  const name = String(req.body?.name || '').trim();
+  const pod_devices = coerceDeviceList(req.body?.pod_devices);
+  const kiosk_devices = coerceDeviceList(req.body?.kiosk_devices);
+  const models = coerceModels(req.body?.models);
+
+  if (!code) {
+    return res.status(400).json({ error: 'code required' });
+  }
+  if (!name) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  if (pod_devices.length === 0) {
+    return res.status(400).json({ error: 'pod_devices must include at least one valid device type' });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE pm_state_configs
+       SET name = $2,
+           pod_devices = $3::jsonb,
+           kiosk_devices = $4::jsonb,
+           models = $5::jsonb,
+           updated_at = NOW()
+       WHERE code = $1
+       RETURNING code, name, pod_devices, kiosk_devices, models, updated_at`,
+      [code, name, JSON.stringify(pod_devices), JSON.stringify(kiosk_devices), JSON.stringify(models)]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'State not found' });
+    }
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update state config' });
+  }
+});
+
+app.delete('/state-configs/:code', authRequired, adminRequired, async (req, res) => {
+  const code = String(req.params.code || '')
+    .trim()
+    .toUpperCase();
+  if (!code) {
+    return res.status(400).json({ error: 'code required' });
+  }
+  try {
+    const n = await pool.query(`SELECT COUNT(*)::int AS c FROM pm_state_configs`);
+    if (Number(n.rows[0].c) <= 1) {
+      return res.status(400).json({ error: 'Cannot delete the last state configuration' });
+    }
+    const result = await pool.query(`DELETE FROM pm_state_configs WHERE code = $1 RETURNING code`, [code]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'State not found' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to delete state config' });
+  }
+});
+
 app.get('/admin', (req, res) => {
   res.redirect(302, '/admin.html');
 });
@@ -628,6 +898,7 @@ app.post('/update-item', authRequired, async (req, res) => {
 async function start() {
   try {
     await ensureAuthTables();
+    await ensurePmStateConfigs();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
