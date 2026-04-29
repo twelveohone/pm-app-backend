@@ -162,9 +162,6 @@
         <button type="button" id="btn-nw-add">Add device</button>
       </div>
 
-      <label for="sc-models">Additional models (JSON, optional)</label>
-      <p class="hint" style="margin-top:0;">Only if you need model text for device types not listed above.</p>
-      <textarea id="sc-models" class="wide" style="min-height:120px;">{}</textarea>
       <div class="row">
         <button type="button" id="btn-state-save">Save</button>
         <button type="button" class="secondary" id="btn-state-clear">Clear form</button>
@@ -380,7 +377,6 @@
     $('nw-add-model').value = '';
     var ndev = $('nw-add-device');
     if (ndev) ndev.value = '';
-    $('sc-models').value = '{}';
     renderWorkstationList();
     renderNonWorkstationList();
     $('state-form-title').textContent = 'Add or edit state';
@@ -407,13 +403,6 @@
       return { type: t, model: models[t] != null ? String(models[t]) : '' };
     });
     renderNonWorkstationList();
-    var podSet = new Set(pod.map(String));
-    var kioskSet = new Set(kiosk.map(String));
-    var extra = {};
-    Object.keys(models).forEach(function (k) {
-      if (!podSet.has(k) && !kioskSet.has(k)) extra[k] = models[k];
-    });
-    $('sc-models').value = JSON.stringify(extra, null, 2);
     $('state-form-title').textContent = 'Edit state ' + s.code;
     show($('statecfg-form-err'), '');
   }
@@ -644,16 +633,6 @@
     show($('statecfg-form-err'), '');
     const code = $('sc-code').value.trim().toUpperCase();
     const name = $('sc-name').value.trim();
-    var extraModels;
-    try {
-      extraModels = JSON.parse($('sc-models').value || '{}');
-      if (typeof extraModels !== 'object' || extraModels === null || Array.isArray(extraModels)) {
-        throw new Error('Models JSON must be an object');
-      }
-    } catch (e) {
-      show($('statecfg-form-err'), 'Invalid models JSON: ' + (e.message || String(e)));
-      return;
-    }
     var nwModels = {};
     nonWorkstationRows.forEach(function (r) {
       nwModels[r.type] = r.model;
@@ -662,7 +641,7 @@
     workstationRows.forEach(function (r) {
       wsModels[r.type] = r.model;
     });
-    var models = Object.assign({}, extraModels, nwModels, wsModels);
+    var models = Object.assign({}, nwModels, wsModels);
     var payload = {
       name: name,
       pod_devices: workstationRows.map(function (r) { return r.type; }),
