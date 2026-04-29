@@ -376,6 +376,26 @@ app.patch('/auth/users/:id', authRequired, adminRequired, async (req, res) => {
   }
 });
 
+app.delete('/auth/users/:id', authRequired, adminRequired, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) {
+    return res.status(400).json({ error: 'User id required' });
+  }
+  if (id === req.user.sub) {
+    return res.status(400).json({ error: 'You cannot delete your own account' });
+  }
+  try {
+    const result = await pool.query(`DELETE FROM users WHERE id = $1 RETURNING id`, [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
 async function adminCountTable(tableKey) {
   const allowed = { users: 'users', pm_sessions: 'pm_sessions', pm_items: 'pm_items' };
   const table = allowed[tableKey];
