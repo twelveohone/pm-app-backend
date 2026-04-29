@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
@@ -13,6 +14,18 @@ const REQUIRE_AUTH = String(process.env.REQUIRE_AUTH || 'false').toLowerCase() =
 const ALLOW_SELF_SIGNUP = String(process.env.ALLOW_SELF_SIGNUP || 'true').toLowerCase() === 'true';
 
 app.use(express.json({ limit: '10mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+function attachUserFromToken(req) {
+  const raw = req.headers.authorization || '';
+  const [scheme, token] = raw.split(' ');
+  if (scheme !== 'Bearer' || !token || !JWT_SECRET) return;
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+  } catch {
+    /* invalid token */
+  }
+}
 
 const DB_SSL = String(process.env.DB_SSL || '').toLowerCase() === 'true';
 const DATABASE_URL = process.env.DATABASE_URL || '';
@@ -33,22 +46,15 @@ const poolConfig = DATABASE_URL
 const pool = new Pool(poolConfig);
 
 function authRequired(req, res, next) {
+  attachUserFromToken(req);
   if (!REQUIRE_AUTH) return next();
-  const raw = req.headers.authorization || '';
-  const [scheme, token] = raw.split(' ');
-  if (scheme !== 'Bearer' || !token) {
+  if (!req.user) {
     return res.status(401).json({ error: 'Missing or invalid authorization header' });
   }
   if (!JWT_SECRET) {
     return res.status(500).json({ error: 'JWT secret is not configured on server' });
   }
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload;
-    return next();
-  } catch {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
+  return next();
 }
 
 function adminRequired(req, res, next) {
@@ -295,6 +301,109 @@ app.post('/auth/users', authRequired, adminRequired, async (req, res) => {
     console.error(err);
     return res.status(500).json({ error: 'Failed to create user' });
   }
+});
+
+app.get('/auth/users', authRequired, adminRequired, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, full_name, email, role, is_active, created_at
+       FROM users
+       ORDER BY created_at DESC`
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to list users' });
+  }
+});
+
+app.patch('/auth/users/:id', authRequired, adminRequired, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  const roleIn = req.body?.role;
+  const isActiveIn = req.body?.is_active;
+  const password =
+    req.body?.password !== undefined && req.body?.password !== null
+      ? String(req.body.password)
+      : undefined;
+
+  if (!id) {
+    return res.status(400).json({ error: 'User id required' });
+  }
+  if (roleIn === undefined && isActiveIn === undefined && password === undefined) {
+    return res.status(400).json({ error: 'Nothing to update' });
+  }
+  if (isActiveIn === false && id === req.user.sub) {
+    return res.status(400).json({ error: 'You cannot deactivate your own account' });
+  }
+
+  const sets = [];
+  const values = [];
+  let i = 1;
+
+  if (roleIn !== undefined) {
+    const role = String(roleIn).trim().toLowerCase();
+    if (!['tech', 'manager', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'role must be tech, manager, or admin' });
+    }
+    sets.push(`role = $${i++}`);
+    values.push(role);
+  }
+  if (isActiveIn !== undefined) {
+    sets.push(`is_active = $${i++}`);
+    values.push(Boolean(isActiveIn));
+  }
+  if (password !== undefined) {
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    sets.push(`password_hash = $${i++}`);
+    values.push(await bcrypt.hash(password, SALT_ROUNDS));
+  }
+
+  sets.push('updated_at = NOW()');
+  values.push(id);
+
+  try {
+    const sql = `UPDATE users SET ${sets.join(', ')} WHERE id = $${i} RETURNING id, full_name, email, role, is_active, created_at`;
+    const result = await pool.query(sql, values);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+async function adminCountTable(tableKey) {
+  const allowed = { users: 'users', pm_sessions: 'pm_sessions', pm_items: 'pm_items' };
+  const table = allowed[tableKey];
+  if (!table) return null;
+  try {
+    const r = await pool.query(`SELECT COUNT(*)::int AS c FROM ${table}`);
+    return r.rows[0].c;
+  } catch {
+    return null;
+  }
+}
+
+app.get('/auth/admin/stats', authRequired, adminRequired, async (req, res) => {
+  try {
+    const [users, pm_sessions, pm_items] = await Promise.all([
+      adminCountTable('users'),
+      adminCountTable('pm_sessions'),
+      adminCountTable('pm_items'),
+    ]);
+    return res.json({ users, pm_sessions, pm_items });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load stats' });
+  }
+});
+
+app.get('/admin', (req, res) => {
+  res.redirect(302, '/admin.html');
 });
 
 app.get('/items', authRequired, async (req, res) => {
