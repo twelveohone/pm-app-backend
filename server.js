@@ -10,6 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET || '';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '12h';
 const SALT_ROUNDS = Number(process.env.PASSWORD_SALT_ROUNDS || 10);
 const REQUIRE_AUTH = String(process.env.REQUIRE_AUTH || 'false').toLowerCase() === 'true';
+const ALLOW_SELF_SIGNUP = String(process.env.ALLOW_SELF_SIGNUP || 'true').toLowerCase() === 'true';
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -76,10 +77,40 @@ async function ensureAuthTables() {
   const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD || '';
   const adminName = (process.env.ADMIN_NAME || 'Admin User').trim();
-  if (!adminEmail || !adminPassword) return;
+  const resetOnBoot =
+    String(process.env.ADMIN_RESET_PASSWORD_ON_BOOT || '').toLowerCase() === 'true';
+
+  if (!adminEmail || !adminPassword) {
+    console.log('ADMIN_EMAIL/ADMIN_PASSWORD not set; skipping admin bootstrap');
+    return;
+  }
+
+  if (resetOnBoot) {
+    const passwordHash = await bcrypt.hash(adminPassword, SALT_ROUNDS);
+    const updated = await pool.query(
+      `UPDATE users
+       SET password_hash = $1, full_name = $2, role = 'admin', is_active = TRUE, updated_at = NOW()
+       WHERE email = $3`,
+      [passwordHash, adminName, adminEmail]
+    );
+    if (updated.rowCount === 0) {
+      await pool.query(
+        `INSERT INTO users (id, full_name, email, password_hash, role, is_active)
+         VALUES (gen_random_uuid(), $1, $2, $3, 'admin', TRUE)`,
+        [adminName, adminEmail, passwordHash]
+      );
+      console.log(`Seeded admin user (reset mode): ${adminEmail}`);
+    } else {
+      console.log(`Admin password updated from env (ADMIN_RESET_PASSWORD_ON_BOOT): ${adminEmail}`);
+    }
+    return;
+  }
 
   const existing = await pool.query(`SELECT id FROM users WHERE email = $1 LIMIT 1`, [adminEmail]);
-  if (existing.rows.length > 0) return;
+  if (existing.rows.length > 0) {
+    console.log(`Admin user already exists, skipping seed: ${adminEmail}`);
+    return;
+  }
 
   const passwordHash = await bcrypt.hash(adminPassword, SALT_ROUNDS);
   await pool.query(
@@ -153,6 +184,63 @@ app.post('/auth/login', async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+app.post('/auth/register', async (req, res) => {
+  if (!ALLOW_SELF_SIGNUP) {
+    return res.status(403).json({ error: 'Registration is disabled. Ask an admin for an account.' });
+  }
+  if (!JWT_SECRET) {
+    return res.status(500).json({ error: 'JWT secret is not configured on server' });
+  }
+
+  const fullName = String(req.body?.full_name || '').trim();
+  const email = String(req.body?.email || '')
+    .trim()
+    .toLowerCase();
+  const password = String(req.body?.password || '');
+
+  if (!fullName || !email || !password) {
+    return res.status(400).json({ error: 'full_name, email, and password are required' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    const result = await pool.query(
+      `INSERT INTO users (id, full_name, email, password_hash, role, is_active, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, 'tech', TRUE, NOW(), NOW())
+       RETURNING id, full_name, email, role`,
+      [fullName, email, passwordHash]
+    );
+    const user = result.rows[0];
+    const token = jwt.sign(
+      { sub: user.id, email: user.email, role: user.role, full_name: user.full_name },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    return res.status(201).json({
+      token,
+      user: {
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    if (String(err?.code) === '23505') {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Registration failed' });
   }
 });
 
