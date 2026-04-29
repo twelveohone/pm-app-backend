@@ -111,7 +111,10 @@
         </div>
       </div>
       <label>Workstation Devices</label>
-      <p class="hint" style="margin-top:0;">List is built from the row below. Each device type can appear once.</p>
+      <p class="hint" style="margin-top:0;">
+        Add each device below. Plain-English names are converted to keys (e.g. <strong>Camera Tower</strong> →
+        <code>camera_tower</code>). Each type can appear once.
+      </p>
       <div id="sc-workstation-panel" class="device-panel">
         <p id="ws-empty" class="ws-empty">No workstation devices yet. Add one below.</p>
         <table id="ws-table" class="hidden" style="width:100%;">
@@ -124,7 +127,7 @@
       <div class="row ws-add-row">
         <div style="flex:1;min-width:200px;">
           <label for="ws-add-device">Device</label>
-          <input id="ws-add-device" type="text" placeholder="e.g. camera_tower" autocomplete="off" spellcheck="false" />
+          <input id="ws-add-device" type="text" placeholder="e.g. Camera Tower or camera_tower" autocomplete="off" spellcheck="false" />
         </div>
         <div style="flex:1;min-width:160px;">
           <label for="ws-add-model">Model</label>
@@ -229,6 +232,39 @@
   let editingStateCode = null;
   let cachedDeviceTypesList = [];
   let workstationRows = [];
+
+  /** Turn friendly text (e.g. "Camera Tower") into canonical key (e.g. camera_tower). */
+  function resolveDeviceTypeKey(raw) {
+    var trimmed = String(raw || '').trim();
+    if (!trimmed) return '';
+
+    var lower = trimmed.toLowerCase();
+    var compact = lower.replace(/[\s\-_]+/g, '');
+    var slug = lower
+      .replace(/[\s\-]+/g, '_')
+      .replace(/[^a-z0-9_]/g, '')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    var list = cachedDeviceTypesList;
+    if (list && list.length) {
+      if (list.indexOf(slug) >= 0) return slug;
+      if (list.indexOf(trimmed) >= 0) return trimmed;
+      var i;
+      for (i = 0; i < list.length; i++) {
+        var t = list[i];
+        if (String(t).toLowerCase() === lower) return t;
+        var human = String(t).replace(/_/g, ' ');
+        if (human === lower) return t;
+      }
+      for (i = 0; i < list.length; i++) {
+        var t2 = list[i];
+        if (String(t2).replace(/_/g, '') === compact) return t2;
+      }
+    }
+
+    return slug;
+  }
 
   function renderWorkstationList() {
     var tbody = $('ws-tbody');
@@ -493,7 +529,8 @@
 
   $('btn-ws-add').addEventListener('click', function () {
     var devIn = $('ws-add-device');
-    var dt = (devIn && devIn.value ? devIn.value : '').trim();
+    var raw = devIn && devIn.value ? devIn.value : '';
+    var dt = resolveDeviceTypeKey(raw);
     var model = ($('ws-add-model').value || '').trim();
     if (!dt) {
       alert('Enter a device type (see allowed keys above).');
