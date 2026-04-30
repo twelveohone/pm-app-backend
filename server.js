@@ -1025,6 +1025,36 @@ app.put('/sites/:id', authRequired, async (req, res) => {
   }
 });
 
+app.delete('/sites/:id', authRequired, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) {
+    return res.status(400).json({ error: 'id required' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `DELETE FROM pm_items WHERE session_id IN (SELECT id FROM pm_sessions WHERE site_id = $1)`,
+      [id]
+    );
+    await client.query(`DELETE FROM pm_sessions WHERE site_id = $1`, [id]);
+    const del = await client.query(`DELETE FROM sites WHERE id = $1`, [id]);
+    await client.query('COMMIT');
+    if (del.rowCount === 0) {
+      return res.status(404).json({ error: 'Site not found' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch {}
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to delete site' });
+  } finally {
+    client.release();
+  }
+});
+
 app.get('/admin', (req, res) => {
   res.redirect(302, '/admin.html');
 });
