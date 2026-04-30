@@ -936,6 +936,20 @@ const HARDWARE_REGISTER_SORT_COLUMNS = {
   batch: 'import_batch',
 };
 
+/** Substring match on multiple columns (case-insensitive, no wildcards). */
+function hardwareRegisterTextFilterClause(needleParamIndex) {
+  const i = Number(needleParamIndex);
+  return ` AND (
+    position(lower($${i}) in lower(coalesce(location, ''))) > 0
+    OR position(lower($${i}) in lower(coalesce(asset_tag, ''))) > 0
+    OR position(lower($${i}) in lower(coalesce(serial_number, ''))) > 0
+    OR position(lower($${i}) in lower(coalesce(model, ''))) > 0
+    OR position(lower($${i}) in lower(coalesce(model_category, ''))) > 0
+    OR position(lower($${i}) in lower(coalesce(state_name, ''))) > 0
+    OR position(lower($${i}) in lower(coalesce(import_batch, ''))) > 0
+  )`;
+}
+
 /** Enterprise hardware register rows (spreadsheet import), filterable by state code (TN, MA, …). */
 app.get('/auth/admin/hardware-register', authRequired, async (req, res) => {
   const state = String(req.query.state || '')
@@ -945,23 +959,34 @@ app.get('/auth/admin/hardware-register', authRequired, async (req, res) => {
   if (!state || !/^[A-Z0-9]{2,10}$/.test(state)) {
     return res.status(400).json({ error: 'state query param is required (e.g. TN)' });
   }
+  const q = String(req.query.q || '').trim();
   const sortKey = String(req.query.sort || 'category').toLowerCase();
   const sortCol = HARDWARE_REGISTER_SORT_COLUMNS[sortKey] || HARDWARE_REGISTER_SORT_COLUMNS.category;
   const dirRaw = String(req.query.dir || 'asc').toLowerCase();
   const dir = dirRaw === 'desc' ? 'DESC' : 'ASC';
   const tiebreak = `model_category ASC NULLS LAST, location ASC NULLS LAST, asset_tag ASC NULLS LAST, serial_number ASC NULLS LAST`;
   try {
+    const params = [state];
+    let textClause = '';
+    if (q) {
+      params.push(q);
+      textClause = hardwareRegisterTextFilterClause(2);
+    }
+    params.push(limit);
+    const limitIdx = params.length;
     const result = await pool.query(
       `SELECT id, asset_tag, serial_number, model, model_category, location, state_name, state_code, import_batch,
               pm_notes, pm_cleaned, pm_damaged
        FROM hardware_inventory_rows
        WHERE state_code = $1
+       ${textClause}
        ORDER BY ${sortCol} ${dir} NULLS LAST, ${tiebreak}
-       LIMIT $2`,
-      [state, limit]
+       LIMIT $${limitIdx}`,
+      params
     );
     return res.json({
       state,
+      q: q || null,
       sort: sortKey in HARDWARE_REGISTER_SORT_COLUMNS ? sortKey : 'category',
       dir: dir === 'DESC' ? 'desc' : 'asc',
       count: result.rows.length,

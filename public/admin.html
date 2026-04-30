@@ -883,13 +883,13 @@
     <div class="card">
       <strong>Hardware register</strong>
       <p class="hint" style="margin-top:.35rem;">
-        Enterprise asset rows in <code>hardware_inventory_rows</code> (bulk import). Filter by <code>state_code</code> (TN, MA, …).
+        Enterprise asset rows in <code>hardware_inventory_rows</code> (bulk import). Choose a <code>state_code</code> (TN, MA, …), then optionally narrow rows with <strong>Text filter</strong> (matches location, asset tag, serial, model, category, state name from file, or import batch — case-insensitive).
         Rows without a matching <strong>State &amp; devices</strong> name/code have no <code>state_code</code> and won&apos;t show in a state filter.
         <span class="admin-only">Admins can edit or delete rows in the table below.</span>
         Technicians use the mobile app for ongoing PM updates.
       </p>
       <p id="hw-inv-summary" class="hint" style="margin-top:.5rem;"></p>
-      <div class="row" style="margin-top:.75rem;">
+      <div class="row" style="margin-top:.75rem; flex-wrap:wrap;">
         <div>
           <label for="hw-reg-state-select">State</label>
           <select id="hw-reg-state-select" style="min-width:240px;"></select>
@@ -912,7 +912,15 @@
             <option value="desc">Z → A / high → low</option>
           </select>
         </div>
-        <button type="button" class="secondary" id="btn-hw-reg-load">Load rows</button>
+        <div style="align-self:flex-end;">
+          <button type="button" class="secondary" id="btn-hw-reg-load">Load rows</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:.65rem;">
+        <div style="flex:1; min-width:220px; max-width:520px;">
+          <label for="hw-reg-text-filter">Text filter (optional)</label>
+          <input id="hw-reg-text-filter" type="text" placeholder="e.g. Dave's Vehicle, asset tag, or serial" autocomplete="off" style="width:100%; max-width:520px;" />
+        </div>
       </div>
       <div id="hw-reg-err" class="err hidden"></div>
       <p id="hw-reg-summary" class="hint" style="margin:.5rem 0 0;"></p>
@@ -1518,6 +1526,26 @@
     await fillStateSelectFromConfigs(sel, { leadingBlank: true });
   }
 
+  function hardwareRegisterQueryString() {
+    var sel = $('hw-reg-state-select');
+    var sortSel = $('hw-reg-sort-select');
+    var dirSel = $('hw-reg-dir-select');
+    var filterIn = $('hw-reg-text-filter');
+    var code = sel && sel.value ? String(sel.value).trim() : '';
+    var sort = sortSel && sortSel.value ? String(sortSel.value) : 'category';
+    var dir = dirSel && dirSel.value ? String(dirSel.value) : 'asc';
+    var q = filterIn && filterIn.value ? String(filterIn.value).trim() : '';
+    var parts =
+      'state=' +
+      encodeURIComponent(code) +
+      '&sort=' +
+      encodeURIComponent(sort) +
+      '&dir=' +
+      encodeURIComponent(dir);
+    if (q) parts += '&q=' + encodeURIComponent(q);
+    return parts;
+  }
+
   async function refreshHardwareRegister() {
     var sel = $('hw-reg-state-select');
     var body = $('hw-reg-body');
@@ -1531,25 +1559,15 @@
       return;
     }
     try {
-      var sortSel = $('hw-reg-sort-select');
-      var dirSel = $('hw-reg-dir-select');
-      var sort = sortSel && sortSel.value ? String(sortSel.value) : 'category';
-      var dir = dirSel && dirSel.value ? String(dirSel.value) : 'asc';
-      var data = await api(
-        '/auth/admin/hardware-register?state=' +
-          encodeURIComponent(code) +
-          '&sort=' +
-          encodeURIComponent(sort) +
-          '&dir=' +
-          encodeURIComponent(dir),
-        { method: 'GET' }
-      );
+      var data = await api('/auth/admin/hardware-register?' + hardwareRegisterQueryString(), { method: 'GET' });
       var rows = data.rows || [];
       if (summary) {
+        var filterNote = data.q ? ' · text contains “' + data.q + '”' : '';
         summary.textContent =
           rows.length +
           ' hardware register row(s) for state ' +
           (data.state || code) +
+          filterNote +
           ', sorted by ' +
           (data.sort || 'category') +
           ' (' +
@@ -2386,6 +2404,14 @@
   var hwRegDir = $('hw-reg-dir-select');
   if (hwRegDir) {
     hwRegDir.addEventListener('change', function () {
+      refreshHardwareRegister();
+    });
+  }
+  var hwRegTextFilter = $('hw-reg-text-filter');
+  if (hwRegTextFilter) {
+    hwRegTextFilter.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
       refreshHardwareRegister();
     });
   }
