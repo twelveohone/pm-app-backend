@@ -941,7 +941,8 @@ app.get('/auth/admin/hardware-register', authRequired, async (req, res) => {
   const tiebreak = `model_category ASC NULLS LAST, location ASC NULLS LAST, asset_tag ASC NULLS LAST, serial_number ASC NULLS LAST`;
   try {
     const result = await pool.query(
-      `SELECT asset_tag, serial_number, model, model_category, location, state_name, state_code, import_batch
+      `SELECT id, asset_tag, serial_number, model, model_category, location, state_name, state_code, import_batch,
+              pm_notes, pm_cleaned, pm_damaged
        FROM hardware_inventory_rows
        WHERE state_code = $1
        ORDER BY ${sortCol} ${dir} NULLS LAST, ${tiebreak}
@@ -961,6 +962,91 @@ app.get('/auth/admin/hardware-register', authRequired, async (req, res) => {
   }
 });
 
+/** Admin: update one enterprise hardware register row (imported spreadsheet asset). */
+app.patch('/auth/admin/hardware-register/:id', authRequired, adminRequired, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) {
+    return res.status(400).json({ error: 'row id required' });
+  }
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const fields = [];
+  const values = [];
+  let i = 1;
+
+  const optStr = (key, col) => {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return;
+    const raw = b[key];
+    const v = raw == null || String(raw).trim() === '' ? null : String(raw).trim();
+    fields.push(`${col} = $${i++}`);
+    values.push(v);
+  };
+
+  optStr('location', 'location');
+  optStr('asset_tag', 'asset_tag');
+  optStr('serial_number', 'serial_number');
+  optStr('model', 'model');
+  optStr('model_category', 'model_category');
+  optStr('state_name', 'state_name');
+
+  if (Object.prototype.hasOwnProperty.call(b, 'state_code')) {
+    const sc = String(b.state_code || '').trim().toUpperCase();
+    if (sc && !/^[A-Z0-9]{2,10}$/.test(sc)) {
+      return res.status(400).json({ error: 'state_code must be 2–10 letters or digits' });
+    }
+    fields.push(`state_code = $${i++}`);
+    values.push(sc || null);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'pm_notes')) {
+    const n = b.pm_notes == null || String(b.pm_notes).trim() === '' ? null : String(b.pm_notes);
+    fields.push(`pm_notes = $${i++}`);
+    values.push(n);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'pm_cleaned')) {
+    fields.push(`pm_cleaned = $${i++}`);
+    values.push(Number(b.pm_cleaned) ? 1 : 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'pm_damaged')) {
+    fields.push(`pm_damaged = $${i++}`);
+    values.push(Number(b.pm_damaged) ? 1 : 0);
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).json({ error: 'No allowed fields to update' });
+  }
+
+  values.push(id);
+  try {
+    const result = await pool.query(
+      `UPDATE hardware_inventory_rows SET ${fields.join(', ')} WHERE id = $${i} RETURNING id, asset_tag, serial_number, model, model_category, location, state_name, state_code, import_batch, pm_notes, pm_cleaned, pm_damaged`,
+      values
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Hardware row not found' });
+    }
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update hardware row' });
+  }
+});
+
+app.delete('/auth/admin/hardware-register/:id', authRequired, adminRequired, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) {
+    return res.status(400).json({ error: 'row id required' });
+  }
+  try {
+    const result = await pool.query(`DELETE FROM hardware_inventory_rows WHERE id = $1 RETURNING id`, [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Hardware row not found' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to delete hardware row' });
+  }
+});
+
 const ADMIN_INVENTORY_ORDER_BY = `ORDER BY ps.started_at DESC NULLS LAST,
   COALESCE(s.site_name, '') ASC,
   CASE pi.unit_type WHEN 'pod' THEN 1 WHEN 'kiosk' THEN 2 ELSE 3 END,
@@ -976,7 +1062,7 @@ const ADMIN_INVENTORY_ORDER_BY = `ORDER BY ps.started_at DESC NULLS LAST,
     ELSE 99
   END, pi.device_type`;
 
-async function queryAdminInventory(poolConn, stateCodeRaw) {
+async function queryAdminInventory(poolConn, stateCodeRaw, siteNameRaw) {
   const stateCode = String(stateCodeRaw || '')
     .trim()
     .toUpperCase();
@@ -984,6 +1070,13 @@ async function queryAdminInventory(poolConn, stateCodeRaw) {
     const err = new Error('INVALID_STATE');
     err.code = 'INVALID_STATE';
     throw err;
+  }
+  const siteNeedle = String(siteNameRaw || '').trim();
+  const params = [stateCode];
+  let siteClause = '';
+  if (siteNeedle) {
+    params.push(siteNeedle);
+    siteClause = `AND position(lower($2) in lower(COALESCE(s.site_name, ''))) > 0`;
   }
   const result = await poolConn.query(
     `SELECT
@@ -1007,11 +1100,12 @@ async function queryAdminInventory(poolConn, stateCodeRaw) {
     INNER JOIN pm_sessions ps ON pi.session_id = ps.id
     LEFT JOIN sites s ON ps.site_id = s.id
     WHERE UPPER(COALESCE(NULLIF(TRIM(s.state), ''), 'TN')) = $1
+    ${siteClause}
     ${ADMIN_INVENTORY_ORDER_BY}
     LIMIT 100000`,
-    [stateCode]
+    params
   );
-  return { state: stateCode, rows: result.rows };
+  return { state: stateCode, site: siteNeedle || null, rows: result.rows };
 }
 
 function csvEscapeCell(val) {
@@ -1021,10 +1115,10 @@ function csvEscapeCell(val) {
   return s;
 }
 
-app.get('/auth/admin/inventory', authRequired, async (req, res) => {
+app.get('/auth/admin/inventory', authRequired, adminRequired, async (req, res) => {
   try {
-    const { state, rows } = await queryAdminInventory(pool, req.query.state);
-    return res.json({ state, count: rows.length, rows });
+    const { state, site, rows } = await queryAdminInventory(pool, req.query.state, req.query.site);
+    return res.json({ state, site, count: rows.length, rows });
   } catch (err) {
     if (err.code === 'INVALID_STATE') {
       return res.status(400).json({ error: 'state query param is required (2–10 letter or digit code)' });
@@ -1034,9 +1128,9 @@ app.get('/auth/admin/inventory', authRequired, async (req, res) => {
   }
 });
 
-app.get('/auth/admin/inventory-export', authRequired, async (req, res) => {
+app.get('/auth/admin/inventory-export', authRequired, adminRequired, async (req, res) => {
   try {
-    const { state, rows } = await queryAdminInventory(pool, req.query.state);
+    const { state, site, rows } = await queryAdminInventory(pool, req.query.state, req.query.site);
     const headers = [
       'site_name',
       'resolved_site_state',
@@ -1061,7 +1155,16 @@ app.get('/auth/admin/inventory-export', authRequired, async (req, res) => {
     }
     const body = lines.join('\r\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="inventory-${state}.csv"`);
+    const siteSlug =
+      site && String(site).trim()
+        ? '-' +
+          String(site)
+            .trim()
+            .replace(/[^a-zA-Z0-9]+/g, '_')
+            .replace(/^_|_$/g, '')
+            .slice(0, 48)
+        : '';
+    res.setHeader('Content-Disposition', `attachment; filename="inventory-${state}${siteSlug}.csv"`);
     res.send(body);
   } catch (err) {
     if (err.code === 'INVALID_STATE') {
@@ -1069,6 +1172,111 @@ app.get('/auth/admin/inventory-export', authRequired, async (req, res) => {
     }
     console.error(err);
     return res.status(500).json({ error: 'Failed to export inventory' });
+  }
+});
+
+/** Admin: update one PM checklist row (mobile sync / import-session data). */
+app.patch('/auth/admin/pm-items/:id', authRequired, adminRequired, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) {
+    return res.status(400).json({ error: 'item id required' });
+  }
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const fields = [];
+  const values = [];
+  let i = 1;
+
+  if (Object.prototype.hasOwnProperty.call(b, 'device_type')) {
+    const dt = String(b.device_type || '').trim();
+    if (!PM_DEVICE_TYPES.has(dt)) {
+      return res.status(400).json({ error: 'device_type is not a known device key' });
+    }
+    fields.push(`device_type = $${i++}`);
+    values.push(dt);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'unit_type')) {
+    const ut = String(b.unit_type || '').trim();
+    if (!ut) {
+      return res.status(400).json({ error: 'unit_type cannot be empty' });
+    }
+    fields.push(`unit_type = $${i++}`);
+    values.push(ut);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'unit_index')) {
+    const ui = Math.max(0, Number(b.unit_index) || 0);
+    fields.push(`unit_index = $${i++}`);
+    values.push(ui);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'cleaned')) {
+    fields.push(`cleaned = $${i++}`);
+    values.push(Number(b.cleaned) ? 1 : 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'damaged')) {
+    fields.push(`damaged = $${i++}`);
+    values.push(Number(b.damaged) ? 1 : 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'notes')) {
+    const n = b.notes == null || String(b.notes).trim() === '' ? null : String(b.notes);
+    fields.push(`notes = $${i++}`);
+    values.push(n);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'serial')) {
+    const s = b.serial == null || String(b.serial).trim() === '' ? null : String(b.serial).trim();
+    fields.push(`serial = $${i++}`);
+    values.push(s);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'asset_tag')) {
+    const t = b.asset_tag == null || String(b.asset_tag).trim() === '' ? null : String(b.asset_tag).trim();
+    fields.push(`asset_tag = $${i++}`);
+    values.push(t);
+  }
+  if (Object.prototype.hasOwnProperty.call(b, 'printer_master_pod')) {
+    const p = b.printer_master_pod;
+    const v =
+      p === null || p === '' ? null : Number(p) ? 1 : 0;
+    fields.push(`printer_master_pod = $${i++}`);
+    values.push(v);
+  }
+
+  if (fields.length === 0) {
+    return res.status(400).json({ error: 'No allowed fields to update' });
+  }
+
+  fields.push(`updated_at = $${i++}`);
+  values.push(new Date().toISOString());
+  values.push(id);
+
+  try {
+    const result = await pool.query(
+      `UPDATE pm_items SET ${fields.join(', ')} WHERE id = $${i} RETURNING id, session_id, unit_type, unit_index, device_type, cleaned, damaged, notes, serial, asset_tag, printer_master_pod, updated_at`,
+      values
+    );
+    const row = result.rows[0];
+    if (!row) {
+      return res.status(404).json({ error: 'PM item not found' });
+    }
+    await syncHardwareInventoryFromPmItem(pool, row, row.session_id);
+    return res.json(row);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update PM item' });
+  }
+});
+
+app.delete('/auth/admin/pm-items/:id', authRequired, adminRequired, async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) {
+    return res.status(400).json({ error: 'item id required' });
+  }
+  try {
+    const result = await pool.query(`DELETE FROM pm_items WHERE id = $1 RETURNING id`, [id]);
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'PM item not found' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to delete PM item' });
   }
 });
 

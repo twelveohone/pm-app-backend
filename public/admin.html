@@ -663,6 +663,122 @@
           <div id="site-edit-err" class="err hidden"></div>
         </div>
       </div>
+
+      <div id="pm-item-edit-backdrop" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pm-item-edit-title">
+          <strong id="pm-item-edit-title">Edit PM item</strong>
+          <p class="hint" id="pm-item-edit-sub" style="margin:.35rem 0 0;font-size:.8rem;"></p>
+          <div class="modal-grid" style="margin-top:.65rem;">
+            <div>
+              <label for="pm-item-device">Device type</label>
+              <input id="pm-item-device" type="text" autocomplete="off" placeholder="e.g. printer" />
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="pm-item-unit-type">Unit type</label>
+                <input id="pm-item-unit-type" type="text" autocomplete="off" />
+              </div>
+              <div>
+                <label for="pm-item-unit-idx">Unit index</label>
+                <input id="pm-item-unit-idx" type="number" min="0" step="1" />
+              </div>
+            </div>
+            <div>
+              <label for="pm-item-serial">Serial</label>
+              <input id="pm-item-serial" type="text" autocomplete="off" />
+            </div>
+            <div>
+              <label for="pm-item-asset">Asset tag</label>
+              <input id="pm-item-asset" type="text" autocomplete="off" />
+            </div>
+            <div>
+              <label for="pm-item-notes">Notes</label>
+              <input id="pm-item-notes" type="text" autocomplete="off" />
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="pm-item-cleaned">Cleaned (0/1)</label>
+                <input id="pm-item-cleaned" type="number" min="0" max="1" step="1" />
+              </div>
+              <div>
+                <label for="pm-item-damaged">Damaged (0/1)</label>
+                <input id="pm-item-damaged" type="number" min="0" max="1" step="1" />
+              </div>
+            </div>
+            <div>
+              <label for="pm-item-pmpod">Printer master pod (0/1 or empty)</label>
+              <input id="pm-item-pmpod" type="text" autocomplete="off" placeholder="empty = null" />
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="pm-item-edit-save">Save</button>
+            <button type="button" class="secondary" id="pm-item-edit-cancel">Cancel</button>
+          </div>
+          <div id="pm-item-edit-err" class="err hidden"></div>
+        </div>
+      </div>
+
+      <div id="hw-reg-edit-backdrop" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="hw-reg-edit-title">
+          <strong id="hw-reg-edit-title">Edit hardware register row</strong>
+          <p class="hint" id="hw-reg-edit-sub" style="margin:.35rem 0 0;font-size:.8rem;"></p>
+          <div class="modal-grid" style="margin-top:.65rem;">
+            <div>
+              <label for="hw-reg-edit-location">Location</label>
+              <input id="hw-reg-edit-location" type="text" autocomplete="off" />
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="hw-reg-edit-asset">Asset tag</label>
+                <input id="hw-reg-edit-asset" type="text" autocomplete="off" />
+              </div>
+              <div>
+                <label for="hw-reg-edit-serial">Serial</label>
+                <input id="hw-reg-edit-serial" type="text" autocomplete="off" />
+              </div>
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="hw-reg-edit-model">Model</label>
+                <input id="hw-reg-edit-model" type="text" autocomplete="off" />
+              </div>
+              <div>
+                <label for="hw-reg-edit-cat">Category</label>
+                <input id="hw-reg-edit-cat" type="text" autocomplete="off" />
+              </div>
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="hw-reg-edit-state-name">State name (file)</label>
+                <input id="hw-reg-edit-state-name" type="text" autocomplete="off" />
+              </div>
+              <div>
+                <label for="hw-reg-edit-state-code">State code</label>
+                <input id="hw-reg-edit-state-code" type="text" autocomplete="off" placeholder="TN" />
+              </div>
+            </div>
+            <div>
+              <label for="hw-reg-edit-pm-notes">PM notes (synced fields)</label>
+              <input id="hw-reg-edit-pm-notes" type="text" autocomplete="off" />
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="hw-reg-edit-pm-cleaned">PM cleaned (0/1)</label>
+                <input id="hw-reg-edit-pm-cleaned" type="number" min="0" max="1" step="1" />
+              </div>
+              <div>
+                <label for="hw-reg-edit-pm-damaged">PM damaged (0/1)</label>
+                <input id="hw-reg-edit-pm-damaged" type="number" min="0" max="1" step="1" />
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="hw-reg-edit-save">Save</button>
+            <button type="button" class="secondary" id="hw-reg-edit-cancel">Cancel</button>
+          </div>
+          <div id="hw-reg-edit-err" class="err hidden"></div>
+        </div>
+      </div>
     </div>
     </div>
 
@@ -721,12 +837,56 @@
     </div>
 
     <div id="admin-view-inventory" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-inventory">
+    <div class="card admin-only">
+      <strong>PM checklist items</strong>
+      <p class="hint" style="margin-top:.35rem;">
+        Rows from technician PM sessions (<code>pm_items</code>), filtered by the site&apos;s state. Optionally narrow by a substring of <strong>site name</strong> (case-insensitive). Edits sync to the enterprise hardware register when serial or asset tag matches.
+        Deleting removes the checklist row only; use hardware actions below to change imported register data.
+      </p>
+      <div class="row" style="margin-top:.75rem; flex-wrap:wrap;">
+        <div>
+          <label for="pm-inv-state-select">State</label>
+          <select id="pm-inv-state-select" style="min-width:240px;"></select>
+        </div>
+        <div style="flex:1; min-width:220px; max-width:400px;">
+          <label for="pm-inv-site-filter">Site name contains</label>
+          <input id="pm-inv-site-filter" type="text" placeholder="e.g. Dave's Vehicle (optional)" autocomplete="off" style="width:100%; max-width:400px;" />
+        </div>
+        <div style="align-self:flex-end;">
+          <button type="button" class="secondary" id="btn-pm-inv-load">Load</button>
+        </div>
+        <div style="align-self:flex-end;">
+          <button type="button" class="secondary" id="btn-pm-inv-csv">Download CSV</button>
+        </div>
+      </div>
+      <div id="pm-inv-err" class="err hidden"></div>
+      <p id="pm-inv-summary" class="hint" style="margin:.5rem 0 0;"></p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Site</th>
+              <th>Technician</th>
+              <th>Device</th>
+              <th>Serial</th>
+              <th>Asset tag</th>
+              <th>Notes</th>
+              <th>Cleaned</th>
+              <th>Damaged</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pm-inv-body"></tbody>
+        </table>
+      </div>
+    </div>
     <div class="card">
       <strong>Hardware register</strong>
       <p class="hint" style="margin-top:.35rem;">
         Enterprise asset rows in <code>hardware_inventory_rows</code> (bulk import). Filter by <code>state_code</code> (TN, MA, …).
         Rows without a matching <strong>State &amp; devices</strong> name/code have no <code>state_code</code> and won&apos;t show in a state filter.
-        Ongoing changes use the app, not this admin screen.
+        <span class="admin-only">Admins can edit or delete rows in the table below.</span>
+        Technicians use the mobile app for ongoing PM updates.
       </p>
       <p id="hw-inv-summary" class="hint" style="margin-top:.5rem;"></p>
       <div class="row" style="margin-top:.75rem;">
@@ -768,6 +928,7 @@
               <th>State (file)</th>
               <th>Code</th>
               <th>Batch</th>
+              <th class="admin-only">Actions</th>
             </tr>
           </thead>
           <tbody id="hw-reg-body"></tbody>
@@ -895,7 +1056,7 @@
     var tag = $('portal-tagline');
     if (tag) {
       tag.textContent = isPortalAdmin()
-        ? 'Backend administration — users, sites, state configuration, and hardware register.'
+        ? 'Backend administration — users, sites, state configuration, PM checklist items, and enterprise hardware register (view, edit, delete).'
         : 'View sites, summaries, and hardware. Change your password on the Account tab. Ask an admin for user or configuration changes.';
     }
     var h = $('portal-title');
@@ -1000,6 +1161,13 @@
     } catch (e) {}
     if (v === 'inventory') {
       refreshHardwareInventorySummary().catch(function () {});
+      ensurePmInvStateSelect()
+        .then(function () {
+          if (isPortalAdmin()) return refreshPmInventory();
+        })
+        .catch(function (e) {
+          show($('pm-inv-err'), (e && e.message) || String(e));
+        });
       ensureHardwareRegStateSelect()
         .then(function () {
           return refreshHardwareRegister();
@@ -1294,46 +1462,59 @@
     }
   }
 
-  var fillHwStateSelectInFlight = null;
+  var cachedStateConfigsForSelects = null;
+  var stateConfigsFetchPromise = null;
 
-  function fillStateSelectFromConfigs(sel, opts) {
-    var leadingBlank = opts && opts.leadingBlank;
-    if (!sel || sel.options.length > 0) return Promise.resolve();
-    if (!fillHwStateSelectInFlight) {
-      fillHwStateSelectInFlight = fetch('/state-configs')
+  function getStateConfigsListCached() {
+    if (cachedStateConfigsForSelects) return Promise.resolve(cachedStateConfigsForSelects);
+    if (!stateConfigsFetchPromise) {
+      stateConfigsFetchPromise = fetch('/state-configs')
         .then(function (res) {
           if (!res.ok) throw new Error('Failed to load state list');
           return res.json();
         })
         .then(function (rows) {
-          const list = dedupeStateConfigsByCode(rows);
-          if (sel.options.length > 0) return;
-          sel.innerHTML = '';
-          if (leadingBlank) {
-            const blank = document.createElement('option');
-            blank.value = '';
-            blank.textContent = 'Select state…';
-            sel.appendChild(blank);
-          }
-          for (var i = 0; i < list.length; i++) {
-            var s = list[i];
-            var codeU = String(s.code || '').trim().toUpperCase();
-            const o = document.createElement('option');
-            o.value = codeU;
-            o.textContent = codeU + ' — ' + (s.name || '');
-            sel.appendChild(o);
-          }
-          if (sel.options.length) sel.selectedIndex = 0;
+          cachedStateConfigsForSelects = dedupeStateConfigsByCode(rows);
+          return cachedStateConfigsForSelects;
         })
         .finally(function () {
-          fillHwStateSelectInFlight = null;
+          stateConfigsFetchPromise = null;
         });
     }
-    return fillHwStateSelectInFlight;
+    return stateConfigsFetchPromise;
+  }
+
+  function fillStateSelectFromConfigs(sel, opts) {
+    var leadingBlank = opts && opts.leadingBlank;
+    if (!sel || sel.options.length > 0) return Promise.resolve();
+    return getStateConfigsListCached().then(function (list) {
+      if (sel.options.length > 0) return;
+      sel.innerHTML = '';
+      if (leadingBlank) {
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = 'Select state…';
+        sel.appendChild(blank);
+      }
+      for (var i = 0; i < list.length; i++) {
+        var s = list[i];
+        var codeU = String(s.code || '').trim().toUpperCase();
+        const o = document.createElement('option');
+        o.value = codeU;
+        o.textContent = codeU + ' — ' + (s.name || '');
+        sel.appendChild(o);
+      }
+      if (sel.options.length) sel.selectedIndex = 0;
+    });
   }
 
   async function ensureHardwareRegStateSelect() {
     var sel = $('hw-reg-state-select');
+    await fillStateSelectFromConfigs(sel, { leadingBlank: true });
+  }
+
+  async function ensurePmInvStateSelect() {
+    var sel = $('pm-inv-state-select');
     await fillStateSelectFromConfigs(sel, { leadingBlank: true });
   }
 
@@ -1378,6 +1559,12 @@
       body.innerHTML = '';
       for (const r of rows) {
         var tr = document.createElement('tr');
+        var adminTd = '';
+        if (isPortalAdmin()) {
+          adminTd =
+            '<td><button type="button" class="secondary btn-hw-reg-edit">Edit</button> ' +
+            '<button type="button" class="danger btn-hw-reg-del">Delete</button></td>';
+        }
         tr.innerHTML =
           '<td>' + escapeHtml(r.asset_tag || '') + '</td>' +
           '<td>' + escapeHtml(r.serial_number || '') + '</td>' +
@@ -1386,7 +1573,22 @@
           '<td>' + escapeHtml(r.location || '') + '</td>' +
           '<td>' + escapeHtml(r.state_name || '') + '</td>' +
           '<td><code>' + escapeHtml(String(r.state_code || '')) + '</code></td>' +
-          '<td><code style="font-size:.72rem">' + escapeHtml(String(r.import_batch || '')) + '</code></td>';
+          '<td><code style="font-size:.72rem">' + escapeHtml(String(r.import_batch || '')) + '</code></td>' +
+          adminTd;
+        if (isPortalAdmin()) {
+          var editHw = tr.querySelector('.btn-hw-reg-edit');
+          var delHw = tr.querySelector('.btn-hw-reg-del');
+          if (editHw) {
+            editHw.addEventListener('click', function () {
+              openHwRegEditModal(r);
+            });
+          }
+          if (delHw) {
+            delHw.addEventListener('click', function () {
+              confirmDeleteHwRegRow(r);
+            });
+          }
+        }
         body.appendChild(tr);
       }
     } catch (e) {
@@ -1394,6 +1596,211 @@
       body.innerHTML = '';
       if (summary) summary.textContent = '';
     }
+  }
+
+  var editingPmItemId = '';
+
+  function pmInventoryQueryString() {
+    var sel = $('pm-inv-state-select');
+    var siteIn = $('pm-inv-site-filter');
+    var code = sel && sel.value ? String(sel.value).trim() : '';
+    var site = siteIn && siteIn.value ? String(siteIn.value).trim() : '';
+    var q = 'state=' + encodeURIComponent(code);
+    if (site) q += '&site=' + encodeURIComponent(site);
+    return q;
+  }
+
+  async function refreshPmInventory() {
+    var sel = $('pm-inv-state-select');
+    var body = $('pm-inv-body');
+    var summary = $('pm-inv-summary');
+    if (!sel || !body) return;
+    if (!isPortalAdmin()) return;
+    show($('pm-inv-err'), '');
+    var code = (sel.value || '').trim();
+    if (!code) {
+      body.innerHTML = '';
+      if (summary) summary.textContent = '';
+      return;
+    }
+    try {
+      var data = await api('/auth/admin/inventory?' + pmInventoryQueryString(), { method: 'GET' });
+      var rows = data.rows || [];
+      if (summary) {
+        var sitePart = data.site ? ' · site name contains “' + data.site + '”' : '';
+        summary.textContent =
+          rows.length + ' PM checklist item(s) for state ' + (data.state || code) + sitePart + '.';
+      }
+      body.innerHTML = '';
+      for (const r of rows) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escapeHtml(String(r.site_name || '')) + '</td>' +
+          '<td>' + escapeHtml(String(r.technician_name || '')) + '</td>' +
+          '<td><code>' + escapeHtml(String(r.device_type || '')) + '</code></td>' +
+          '<td>' + escapeHtml(String(r.serial || '')) + '</td>' +
+          '<td>' + escapeHtml(String(r.asset_tag || '')) + '</td>' +
+          '<td>' + escapeHtml(String(r.notes || '')) + '</td>' +
+          '<td>' + (r.cleaned ? '1' : '0') + '</td>' +
+          '<td>' + (r.damaged ? '1' : '0') + '</td>' +
+          '<td><button type="button" class="secondary btn-pm-item-edit">Edit</button> ' +
+          '<button type="button" class="danger btn-pm-item-del">Delete</button></td>';
+        var editB = tr.querySelector('.btn-pm-item-edit');
+        var delB = tr.querySelector('.btn-pm-item-del');
+        if (editB) {
+          editB.addEventListener('click', function () {
+            openPmItemEditModal(r);
+          });
+        }
+        if (delB) {
+          delB.addEventListener('click', function () {
+            confirmDeletePmItem(r);
+          });
+        }
+        body.appendChild(tr);
+      }
+    } catch (e) {
+      show($('pm-inv-err'), e.message);
+      body.innerHTML = '';
+      if (summary) summary.textContent = '';
+    }
+  }
+
+  function openPmItemEditModal(r) {
+    editingPmItemId = String(r.item_id || '');
+    if (!editingPmItemId) return;
+    $('pm-item-edit-sub').textContent = 'Item id: ' + editingPmItemId;
+    $('pm-item-device').value = String(r.device_type || '');
+    $('pm-item-unit-type').value = String(r.unit_type || '');
+    $('pm-item-unit-idx').value = String(r.unit_index != null ? r.unit_index : 0);
+    $('pm-item-serial').value = String(r.serial || '');
+    $('pm-item-asset').value = String(r.asset_tag || '');
+    $('pm-item-notes').value = String(r.notes || '');
+    $('pm-item-cleaned').value = r.cleaned ? '1' : '0';
+    $('pm-item-damaged').value = r.damaged ? '1' : '0';
+    var pmp = r.printer_master_pod;
+    $('pm-item-pmpod').value = pmp == null || pmp === '' ? '' : String(pmp);
+    show($('pm-item-edit-err'), '');
+    var bd = $('pm-item-edit-backdrop');
+    if (bd) {
+      bd.classList.remove('hidden');
+      bd.setAttribute('aria-hidden', 'false');
+    }
+  }
+
+  function closePmItemEditModal() {
+    editingPmItemId = '';
+    var bd = $('pm-item-edit-backdrop');
+    if (bd) {
+      bd.classList.add('hidden');
+      bd.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function confirmDeletePmItem(r) {
+    var id = String(r.item_id || '');
+    if (!id) return;
+    if (!confirm('Delete this PM checklist row from the database? This cannot be undone.')) return;
+    api('/auth/admin/pm-items/' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function () {
+        return refreshPmInventory();
+      })
+      .then(function () {
+        return refreshStats();
+      })
+      .catch(function (e) {
+        alert((e && e.message) || String(e));
+      });
+  }
+
+  async function downloadPmInventoryCsv() {
+    var sel = $('pm-inv-state-select');
+    var code = sel && sel.value ? String(sel.value).trim() : '';
+    if (!code) {
+      alert('Choose a state first.');
+      return;
+    }
+    try {
+      var res = await fetch('/auth/admin/inventory-export?' + pmInventoryQueryString(), {
+        headers: { Authorization: 'Bearer ' + token() },
+      });
+      if (res.status === 401) {
+        forceLogoutToLogin('Your session expired. Please sign in again.');
+        return;
+      }
+      if (!res.ok) {
+        var err = await res.json().catch(function () {
+          return {};
+        });
+        throw new Error(err.error || res.statusText || 'Export failed');
+      }
+      var blob = await res.blob();
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      var cd = res.headers.get('Content-Disposition');
+      var fnMatch = cd && cd.match(/filename="([^"]+)"/i);
+      var fallback =
+        'inventory-' + code + (($('pm-inv-site-filter') && $('pm-inv-site-filter').value.trim()) ? '-filtered' : '') + '.csv';
+      a.download = fnMatch ? fnMatch[1] : fallback;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      alert((e && e.message) || String(e));
+    }
+  }
+
+  function openHwRegEditModal(r) {
+    if (!r || !r.id) return;
+    $('hw-reg-edit-sub').textContent = 'Row id: ' + String(r.id);
+    $('hw-reg-edit-location').value = String(r.location || '');
+    $('hw-reg-edit-asset').value = String(r.asset_tag || '');
+    $('hw-reg-edit-serial').value = String(r.serial_number || '');
+    $('hw-reg-edit-model').value = String(r.model || '');
+    $('hw-reg-edit-cat').value = String(r.model_category || '');
+    $('hw-reg-edit-state-name').value = String(r.state_name || '');
+    $('hw-reg-edit-state-code').value = String(r.state_code || '');
+    $('hw-reg-edit-pm-notes').value = String(r.pm_notes != null ? r.pm_notes : '');
+    $('hw-reg-edit-pm-cleaned').value = r.pm_cleaned ? '1' : '0';
+    $('hw-reg-edit-pm-damaged').value = r.pm_damaged ? '1' : '0';
+    show($('hw-reg-edit-err'), '');
+    var bd = $('hw-reg-edit-backdrop');
+    if (bd) {
+      bd.dataset.rowId = String(r.id);
+      bd.classList.remove('hidden');
+      bd.setAttribute('aria-hidden', 'false');
+    }
+  }
+
+  function closeHwRegEditModal() {
+    var bd = $('hw-reg-edit-backdrop');
+    if (bd) {
+      delete bd.dataset.rowId;
+      bd.classList.add('hidden');
+      bd.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function confirmDeleteHwRegRow(r) {
+    if (!r || !r.id) return;
+    if (
+      !confirm(
+        'Delete this hardware register row from the database? This cannot be undone.'
+      )
+    )
+      return;
+    api('/auth/admin/hardware-register/' + encodeURIComponent(String(r.id)), { method: 'DELETE' })
+      .then(function () {
+        return refreshHardwareRegister();
+      })
+      .then(function () {
+        return refreshHardwareInventorySummary();
+      })
+      .then(function () {
+        return refreshStats();
+      })
+      .catch(function (e) {
+        alert((e && e.message) || String(e));
+      });
   }
 
   async function refreshStats() {
@@ -1853,7 +2260,111 @@
     if (ev.key !== 'Escape') return;
     var bd = $('site-edit-backdrop');
     if (bd && !bd.classList.contains('hidden')) closeSiteEditModal();
+    var pmBd = $('pm-item-edit-backdrop');
+    if (pmBd && !pmBd.classList.contains('hidden')) closePmItemEditModal();
+    var hwBd = $('hw-reg-edit-backdrop');
+    if (hwBd && !hwBd.classList.contains('hidden')) closeHwRegEditModal();
   });
+
+  var pmInvSel = $('pm-inv-state-select');
+  if (pmInvSel) {
+    pmInvSel.addEventListener('change', function () {
+      if (isPortalAdmin()) refreshPmInventory();
+    });
+  }
+  var pmInvLoad = $('btn-pm-inv-load');
+  if (pmInvLoad) {
+    pmInvLoad.addEventListener('click', function () {
+      refreshPmInventory();
+    });
+  }
+  var pmInvCsv = $('btn-pm-inv-csv');
+  if (pmInvCsv) {
+    pmInvCsv.addEventListener('click', function () {
+      downloadPmInventoryCsv();
+    });
+  }
+
+  var pmItemCancel = $('pm-item-edit-cancel');
+  if (pmItemCancel) pmItemCancel.addEventListener('click', closePmItemEditModal);
+  var pmItemBd = $('pm-item-edit-backdrop');
+  if (pmItemBd) {
+    pmItemBd.addEventListener('click', function (ev) {
+      if (ev.target === pmItemBd) closePmItemEditModal();
+    });
+  }
+  var pmItemSave = $('pm-item-edit-save');
+  if (pmItemSave) {
+    pmItemSave.addEventListener('click', async function () {
+      show($('pm-item-edit-err'), '');
+      if (!editingPmItemId) return;
+      var pmpRaw = ($('pm-item-pmpod').value || '').trim();
+      var body = {
+        device_type: ($('pm-item-device').value || '').trim(),
+        unit_type: ($('pm-item-unit-type').value || '').trim(),
+        unit_index: parseInt($('pm-item-unit-idx').value, 10) || 0,
+        serial: ($('pm-item-serial').value || '').trim(),
+        asset_tag: ($('pm-item-asset').value || '').trim(),
+        notes: ($('pm-item-notes').value || '').trim(),
+        cleaned: parseInt($('pm-item-cleaned').value, 10) ? 1 : 0,
+        damaged: parseInt($('pm-item-damaged').value, 10) ? 1 : 0,
+        printer_master_pod: pmpRaw === '' ? null : parseInt(pmpRaw, 10) ? 1 : 0,
+      };
+      try {
+        await api('/auth/admin/pm-items/' + encodeURIComponent(editingPmItemId), {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        });
+        closePmItemEditModal();
+        await refreshPmInventory();
+        await refreshStats();
+      } catch (e) {
+        show($('pm-item-edit-err'), e.message);
+      }
+    });
+  }
+
+  var hwRegEditCancel = $('hw-reg-edit-cancel');
+  if (hwRegEditCancel) hwRegEditCancel.addEventListener('click', closeHwRegEditModal);
+  var hwRegEditBd = $('hw-reg-edit-backdrop');
+  if (hwRegEditBd) {
+    hwRegEditBd.addEventListener('click', function (ev) {
+      if (ev.target === hwRegEditBd) closeHwRegEditModal();
+    });
+  }
+  var hwRegEditSave = $('hw-reg-edit-save');
+  if (hwRegEditSave) {
+    hwRegEditSave.addEventListener('click', async function () {
+      show($('hw-reg-edit-err'), '');
+      var bd = $('hw-reg-edit-backdrop');
+      var rid = bd && bd.dataset.rowId ? String(bd.dataset.rowId) : '';
+      if (!rid) return;
+      var body = {
+        location: ($('hw-reg-edit-location').value || '').trim(),
+        asset_tag: ($('hw-reg-edit-asset').value || '').trim(),
+        serial_number: ($('hw-reg-edit-serial').value || '').trim(),
+        model: ($('hw-reg-edit-model').value || '').trim(),
+        model_category: ($('hw-reg-edit-cat').value || '').trim(),
+        state_name: ($('hw-reg-edit-state-name').value || '').trim(),
+        state_code: ($('hw-reg-edit-state-code').value || '').trim(),
+        pm_notes: ($('hw-reg-edit-pm-notes').value || '').trim(),
+        pm_cleaned: parseInt($('hw-reg-edit-pm-cleaned').value, 10) ? 1 : 0,
+        pm_damaged: parseInt($('hw-reg-edit-pm-damaged').value, 10) ? 1 : 0,
+      };
+      try {
+        await api('/auth/admin/hardware-register/' + encodeURIComponent(rid), {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        });
+        closeHwRegEditModal();
+        await refreshHardwareRegister();
+        await refreshHardwareInventorySummary();
+        await refreshStats();
+      } catch (e) {
+        show($('hw-reg-edit-err'), e.message);
+      }
+    });
+  }
   var hwRegSel = $('hw-reg-state-select');
   if (hwRegSel) {
     hwRegSel.addEventListener('change', function () {
