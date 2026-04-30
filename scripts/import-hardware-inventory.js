@@ -10,9 +10,6 @@
  *   node scripts/import-hardware-inventory.js ".\file.xlsx" --batch tn-v1 --replace
  *   node scripts/import-hardware-inventory.js ".\file.xlsx" --dry-run
  *
- * On Render, prefer uploading the same .xlsx via Admin → Inventory → Hardware inventory (.xlsx)
- * so the import uses the server DATABASE_URL without copying secrets locally.
- *
  * Requires DATABASE_URL (or DB_* vars) in .env unless --dry-run.
  * After import, optional: --match-sites tries to set site_id where location = sites.station or site_name.
  */

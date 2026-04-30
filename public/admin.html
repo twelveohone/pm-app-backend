@@ -406,7 +406,7 @@
     <div class="toolbar">
       <div class="toolbar-text">
         <h1>PM Admin</h1>
-        <p class="tagline">Backend administration — users, state configuration, and inventory exports.</p>
+        <p class="tagline">Backend administration — users, sites, state configuration, and hardware register.</p>
       </div>
       <button type="button" class="secondary" id="btn-logout">Sign out</button>
     </div>
@@ -422,7 +422,7 @@
         Users
       </button>
       <button type="button" class="admin-nav-item" data-admin-view="inventory" role="tab" aria-selected="false" id="tab-inventory">
-        Inventory
+        Hardware
       </button>
       <button type="button" class="admin-nav-item" data-admin-view="states" role="tab" aria-selected="false" id="tab-states">
         State &amp; devices
@@ -507,47 +507,13 @@
 
     <div id="admin-view-inventory" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-inventory">
     <div class="card">
-      <strong>Hardware inventory (.xlsx)</strong>
+      <strong>Hardware register</strong>
       <p class="hint" style="margin-top:.35rem;">
-        Upload the enterprise <strong>hardware asset register</strong> (Asset Tag, Model, Location, …). The spreadsheet
-        <strong>State</strong> column is stored as <code>state_name</code> and matched to a <strong>state code</strong>
-        (<code>state_code</code>, e.g. TN) using <strong>State &amp; devices</strong> configuration (code + display name). Rows are stored in
-        <code>hardware_inventory_rows</code>. Use <strong>Enterprise hardware by state</strong> below to browse them by TN / MA.
-        The <strong>PM inventory</strong> section further down is checklist data from the app, not this spreadsheet.
+        Enterprise asset rows in <code>hardware_inventory_rows</code> (bulk import). Filter by <code>state_code</code> (TN, MA, …).
+        Rows without a matching <strong>State &amp; devices</strong> name/code have no <code>state_code</code> and won&apos;t show in a state filter.
+        Ongoing changes use the app, not this admin screen.
       </p>
       <p id="hw-inv-summary" class="hint" style="margin-top:.5rem;"></p>
-      <div class="row" style="margin-top:.75rem; align-items:flex-start;">
-        <div style="flex:1;min-width:200px;">
-          <label for="hw-inv-file">Excel file</label>
-          <input id="hw-inv-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
-        </div>
-        <div>
-          <label for="hw-inv-batch">Batch id (optional)</label>
-          <input id="hw-inv-batch" type="text" placeholder="tn-hardware-2026-04-29" style="max-width:260px;" />
-        </div>
-      </div>
-      <div class="row" style="margin-top:.5rem;">
-        <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:normal;font-size:.88rem;">
-          <input type="checkbox" id="hw-inv-replace" />
-          Replace existing rows for this batch id first
-        </label>
-      </div>
-      <div class="row" style="margin-top:.25rem;">
-        <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:normal;font-size:.88rem;">
-          <input type="checkbox" id="hw-inv-match-sites" checked />
-          Match <code>site_id</code> when Location equals site station or site name
-        </label>
-      </div>
-      <button type="button" id="btn-hw-inv-import">Import to database</button>
-      <div id="hw-inv-err" class="err hidden"></div>
-      <p id="hw-inv-ok" class="hint hidden" style="margin-top:.75rem;color:#166534;font-weight:600;"></p>
-    </div>
-    <div class="card">
-      <strong>Enterprise hardware by state</strong>
-      <p class="hint" style="margin-top:.35rem;">
-        Filter imported register rows by <code>state_code</code> (same TN / MA codes as elsewhere). Rows with a State cell that
-        doesn&apos;t match any configured state stay <code>state_code</code> empty and won&apos;t appear here until you fix the sheet or add a state config.
-      </p>
       <div class="row" style="margin-top:.75rem;">
         <div>
           <label for="hw-reg-state-select">State</label>
@@ -590,46 +556,6 @@
             </tr>
           </thead>
           <tbody id="hw-reg-body"></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="card">
-      <strong>PM inventory by state</strong>
-      <p class="hint" style="margin-top:.35rem;">
-        PM checklist line items (<code>pm_items</code>) for sessions whose site is in the selected state — not the enterprise hardware spreadsheet above.
-        Blank or missing site state is counted as <strong>TN</strong> (same convention as in the app).
-      </p>
-      <div class="row" style="margin-top:.75rem;">
-        <div>
-          <label for="inv-state-select">State</label>
-          <select id="inv-state-select" style="min-width:240px;"></select>
-        </div>
-        <button type="button" class="secondary" id="btn-inv-export">Export CSV</button>
-      </div>
-      <div id="inv-err" class="err hidden"></div>
-      <p id="inv-summary" class="hint" style="margin:.5rem 0 0;"></p>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Site</th>
-              <th>State</th>
-              <th>Session</th>
-              <th>Started</th>
-              <th>Technician</th>
-              <th>Unit type</th>
-              <th>Unit #</th>
-              <th>Device</th>
-              <th>Cleaned</th>
-              <th>Damaged</th>
-              <th>Serial</th>
-              <th>Asset tag</th>
-              <th>Master pod</th>
-              <th>Notes</th>
-              <th>Item updated</th>
-            </tr>
-          </thead>
-          <tbody id="inv-body"></tbody>
         </table>
       </div>
     </div>
@@ -794,13 +720,6 @@
       history.replaceState(null, '', v === 'overview' ? '#overview' : '#' + v);
     } catch (e) {}
     if (v === 'inventory') {
-      ensureInventoryStates()
-        .then(function () {
-          return refreshInventory();
-        })
-        .catch(function (e) {
-          show($('inv-err'), (e && e.message) || String(e));
-        });
       refreshHardwareInventorySummary().catch(function () {});
       ensureHardwareRegStateSelect()
         .then(function () {
@@ -962,11 +881,6 @@
       });
   }
 
-  async function ensureInventoryStates() {
-    var sel = $('inv-state-select');
-    await fillStateSelectFromConfigs(sel);
-  }
-
   async function ensureHardwareRegStateSelect() {
     var sel = $('hw-reg-state-select');
     await fillStateSelectFromConfigs(sel);
@@ -1026,68 +940,6 @@
       }
     } catch (e) {
       show($('hw-reg-err'), e.message);
-      body.innerHTML = '';
-      if (summary) summary.textContent = '';
-    }
-  }
-
-  function fmtTs(iso) {
-    if (iso == null || iso === '') return '—';
-    try {
-      var d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return String(iso);
-      return d.toLocaleString();
-    } catch (e) {
-      return String(iso);
-    }
-  }
-
-  async function refreshInventory() {
-    var sel = $('inv-state-select');
-    var body = $('inv-body');
-    var summary = $('inv-summary');
-    if (!sel || !body) return;
-    show($('inv-err'), '');
-    var code = (sel.value || '').trim();
-    if (!code) {
-      body.innerHTML = '';
-      if (summary) summary.textContent = '';
-      return;
-    }
-    try {
-      var data = await api('/auth/admin/inventory?state=' + encodeURIComponent(code), { method: 'GET' });
-      var rows = data.rows || [];
-      if (summary) {
-        summary.textContent =
-          rows.length +
-          ' row(s) for state ' +
-          (data.state || code) +
-          (rows.length >= 100000 ? ' (results capped at 100,000)' : '') +
-          '.';
-      }
-      body.innerHTML = '';
-      for (const r of rows) {
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td>' + escapeHtml(r.site_name || '') + '</td>' +
-          '<td><code>' + escapeHtml(String(r.resolved_site_state || '')) + '</code></td>' +
-          '<td><code style="font-size:.72rem">' + escapeHtml(String(r.session_id || '')) + '</code></td>' +
-          '<td>' + escapeHtml(fmtTs(r.session_started_at)) + '</td>' +
-          '<td>' + escapeHtml(r.technician_name || '') + '</td>' +
-          '<td><code>' + escapeHtml(String(r.unit_type || '')) + '</code></td>' +
-          '<td>' + escapeHtml(String(r.unit_index != null ? r.unit_index : '')) + '</td>' +
-          '<td><code>' + escapeHtml(String(r.device_type || '')) + '</code></td>' +
-          '<td>' + (r.cleaned ? 'Yes' : 'No') + '</td>' +
-          '<td>' + (r.damaged ? 'Yes' : 'No') + '</td>' +
-          '<td>' + escapeHtml(r.serial || '') + '</td>' +
-          '<td>' + escapeHtml(r.asset_tag || '') + '</td>' +
-          '<td>' + escapeHtml(r.printer_master_pod != null ? String(r.printer_master_pod) : '') + '</td>' +
-          '<td>' + escapeHtml(r.notes || '') + '</td>' +
-          '<td>' + escapeHtml(fmtTs(r.item_updated_at)) + '</td>';
-        body.appendChild(tr);
-      }
-    } catch (e) {
-      show($('inv-err'), e.message);
       body.innerHTML = '';
       if (summary) summary.textContent = '';
     }
@@ -1480,12 +1332,6 @@
     panel(true);
   });
 
-  var invSel = $('inv-state-select');
-  if (invSel) {
-    invSel.addEventListener('change', function () {
-      refreshInventory();
-    });
-  }
   var sitesSel = $('sites-state-select');
   if (sitesSel) {
     sitesSel.addEventListener('change', function () {
@@ -1516,97 +1362,6 @@
       refreshHardwareRegister();
     });
   }
-  var invExp = $('btn-inv-export');
-  if (invExp) {
-    invExp.addEventListener('click', async function () {
-      var sel = $('inv-state-select');
-      var code = sel && sel.value ? String(sel.value).trim() : '';
-      if (!code) {
-        alert('Select a state first.');
-        return;
-      }
-      try {
-        var res = await fetch('/auth/admin/inventory-export?state=' + encodeURIComponent(code), {
-          headers: { Authorization: 'Bearer ' + token() },
-        });
-        if (!res.ok) {
-          var err = await res.json().catch(function () {
-            return {};
-          });
-          throw new Error(err.error || res.statusText || 'Export failed');
-        }
-        var blob = await res.blob();
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'inventory-' + code + '.csv';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(a.href);
-      } catch (e) {
-        alert((e && e.message) || String(e));
-      }
-    });
-  }
-
-  var hwImp = $('btn-hw-inv-import');
-  if (hwImp) {
-    hwImp.addEventListener('click', async function () {
-      var fileIn = $('hw-inv-file');
-      var file = fileIn && fileIn.files && fileIn.files[0];
-      var errEl = $('hw-inv-err');
-      var okEl = $('hw-inv-ok');
-      show(errEl, '');
-      if (okEl) {
-        okEl.textContent = '';
-        okEl.classList.add('hidden');
-      }
-      if (!file) {
-        show(errEl, 'Choose an .xlsx file.');
-        return;
-      }
-      var fd = new FormData();
-      fd.append('file', file);
-      fd.append('batch', $('hw-inv-batch') && $('hw-inv-batch').value ? String($('hw-inv-batch').value).trim() : '');
-      fd.append('replace', $('hw-inv-replace') && $('hw-inv-replace').checked ? 'true' : 'false');
-      fd.append('matchSites', $('hw-inv-match-sites') && $('hw-inv-match-sites').checked ? 'true' : 'false');
-      hwImp.disabled = true;
-      try {
-        var res = await fetch('/auth/admin/hardware-inventory-import', {
-          method: 'POST',
-          headers: { Authorization: 'Bearer ' + token() },
-          body: fd,
-        });
-        var data = await res.json().catch(function () {
-          return {};
-        });
-        if (!res.ok) throw new Error(data.error || res.statusText || 'Import failed');
-        var msg =
-          'Imported ' +
-          data.inserted +
-          ' row(s). Sheet: ' +
-          data.sheetName +
-          ', batch: ' +
-          data.batch +
-          '.';
-        if (data.matchedSites != null) msg += ' Matched sites: ' + data.matchedSites + '.';
-        if (okEl) {
-          okEl.textContent = msg;
-          okEl.classList.remove('hidden');
-        } else {
-          alert(msg);
-        }
-        await refreshStats();
-        await refreshHardwareInventorySummary();
-        await refreshHardwareRegister();
-      } catch (e) {
-        show(errEl, (e && e.message) || String(e));
-      } finally {
-        hwImp.disabled = false;
-      }
-    });
-  }
-
   $('btn-state-clear').addEventListener('click', clearStateForm);
 
   $('btn-ws-add').addEventListener('click', function () {
