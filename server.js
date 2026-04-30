@@ -294,6 +294,22 @@ async function syncHardwareInventoryFromPmItem(q, item, sessionId) {
   const damaged = Number(item.damaged) ? 1 : 0;
   const notes = item.notes != null ? String(item.notes) : null;
   const sid = sessionId != null ? String(sessionId) : item.session_id != null ? String(item.session_id) : null;
+  let location = null;
+  if (sid) {
+    try {
+      const locRes = await q.query(
+        `SELECT COALESCE(NULLIF(TRIM(s.site_name), ''), NULL) AS site_name
+         FROM pm_sessions ps
+         LEFT JOIN sites s ON s.id = ps.site_id
+         WHERE ps.id = $1
+         LIMIT 1`,
+        [sid]
+      );
+      if (locRes.rows[0]?.site_name) location = String(locRes.rows[0].site_name);
+    } catch {
+      location = null;
+    }
+  }
 
   await q.query(
     `UPDATE hardware_inventory_rows
@@ -307,7 +323,19 @@ async function syncHardwareInventoryFromPmItem(q, item, sessionId) {
          END,
          pm_cleaned = $3::smallint,
          pm_damaged = $4::smallint,
-         pm_notes = $5,
+        pm_notes = CASE
+          WHEN $5::text IS NOT NULL AND BTRIM($5::text) <> '' THEN
+            CASE
+              WHEN COALESCE(BTRIM(pm_notes), '') = '' THEN BTRIM($5::text)
+              WHEN POSITION(LOWER(BTRIM($5::text)) IN LOWER(COALESCE(pm_notes, ''))) > 0 THEN pm_notes
+              ELSE COALESCE(pm_notes, '') || ' | ' || BTRIM($5::text)
+            END
+          ELSE pm_notes
+        END,
+        location = CASE
+          WHEN $7::text IS NOT NULL AND BTRIM($7::text) <> '' THEN BTRIM($7::text)
+          ELSE location
+        END,
          last_pm_sync_at = NOW(),
          pm_session_id = $6
      WHERE (
@@ -321,7 +349,7 @@ async function syncHardwareInventoryFromPmItem(q, item, sessionId) {
          OR LOWER(BTRIM(COALESCE(asset_tag, ''))) = LOWER(BTRIM($2::text))
        ))
      )`,
-    [serial, assetTag, cleaned, damaged, notes, sid]
+    [serial, assetTag, cleaned, damaged, notes, sid, location]
   );
 }
 
