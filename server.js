@@ -1378,38 +1378,45 @@ app.get('/auth/inventory-combined-export', authRequired, async (req, res) => {
     const { state, q, rows } = await queryInventoryCombined(pool, req.query.state, req.query.q);
     const fmt = String(req.query.format || 'csv').toLowerCase() === 'xlsx' ? 'xlsx' : 'csv';
     const headers = [
-      'source',
-      'detail',
-      'asset_tag',
-      'serial',
-      'state',
-      'site_or_location',
-      'meta',
-      'row_id',
+      'Model Categories',
+      'Model',
+      'Account',
+      'Asset Tag',
+      'Serial Number',
+      'State',
+      'Location',
+      'Stockroom',
+      'Company',
+      'Installed',
+      'Purchase Order',
+      'Warranty expiration',
+      'Owned',
+      'Contract',
+      'Sold Product',
     ];
-    const lines = [headers.join(',')];
-    for (const row of rows) {
-      const siteOrLoc = row.source === 'pm' ? row.site_name : row.location;
-      const detail = row.source === 'pm' ? row.device_type : row.model;
-      const serial = row.source === 'pm' ? row.serial : row.serial_number;
-      const meta =
-        row.source === 'pm'
-          ? `tech:${row.technician_name || ''}; notes:${row.notes || ''}; damaged:${row.damaged}`
-          : `category:${row.model_category || ''}; batch:${row.import_batch || ''}; file_state:${row.state_name || ''}`;
-      const rid = row.source === 'pm' ? row.item_id : row.id;
-      const st = row.source === 'pm' ? row.state : row.state_code;
-      const lineObj = {
-        source: row.source,
-        state: st,
-        site_or_location: siteOrLoc,
-        detail,
-        serial,
-        asset_tag: row.asset_tag,
-        meta,
-        row_id: rid,
+    const tableRows = rows.map((row) => {
+      const isPm = row.source === 'pm';
+      const detail = isPm ? row.device_type || '' : row.model || '';
+      const siteOrLoc = isPm ? row.site_name || '' : row.location || '';
+      const st = isPm ? row.state || '' : row.state_code || '';
+      return {
+        'Model Categories': isPm ? 'PM Checklist' : row.model_category || '',
+        Model: detail,
+        Account: isPm ? row.technician_name || '' : '',
+        'Asset Tag': row.asset_tag || '',
+        'Serial Number': isPm ? row.serial || '' : row.serial_number || '',
+        State: st,
+        Location: siteOrLoc,
+        Stockroom: '',
+        Company: '',
+        Installed: '',
+        'Purchase Order': '',
+        'Warranty expiration': '',
+        Owned: '',
+        Contract: '',
+        'Sold Product': '',
       };
-      lines.push(headers.map((h) => csvEscapeCell(lineObj[h])).join(','));
-    }
+    });
     const qSlug =
       q && String(q).trim()
         ? '-' +
@@ -1420,27 +1427,6 @@ app.get('/auth/inventory-combined-export', authRequired, async (req, res) => {
             .slice(0, 48)
         : '';
     if (fmt === 'xlsx') {
-      const tableRows = rows.map((row) => {
-        const siteOrLoc = row.source === 'pm' ? row.site_name : row.location;
-        const detail = row.source === 'pm' ? row.device_type : row.model;
-        const serial = row.source === 'pm' ? row.serial : row.serial_number;
-        const meta =
-          row.source === 'pm'
-            ? `tech:${row.technician_name || ''}; notes:${row.notes || ''}; damaged:${row.damaged}`
-            : `category:${row.model_category || ''}; batch:${row.import_batch || ''}; file_state:${row.state_name || ''}`;
-        const rid = row.source === 'pm' ? row.item_id : row.id;
-        const st = row.source === 'pm' ? row.state : row.state_code;
-        return {
-          source: row.source,
-          detail,
-          asset_tag: row.asset_tag,
-          serial,
-          state: st,
-          site_or_location: siteOrLoc,
-          meta,
-          row_id: rid,
-        };
-      });
       const ws = XLSX.utils.json_to_sheet(tableRows, { header: headers });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'inventory');
@@ -1451,6 +1437,10 @@ app.get('/auth/inventory-combined-export', authRequired, async (req, res) => {
       );
       res.setHeader('Content-Disposition', `attachment; filename="inventory-combined-${state}${qSlug}.xlsx"`);
       return res.send(xbuf);
+    }
+    const lines = [headers.join(',')];
+    for (const row of tableRows) {
+      lines.push(headers.map((h) => csvEscapeCell(row[h])).join(','));
     }
     const body = lines.join('\r\n');
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
