@@ -1,0 +1,9 @@
+---
+description: Git commit after changing the Render web portal or admin API
+globs: public/**,server.js
+alwaysApply: false
+---
+
+# Render portal — commit changes
+
+When you edit anything that affects the site hosted on Render (files under `public/`, or `server.js` routes used by the admin UI or mobile clients), finish the task with a **git commit** in this `pm-app-backend` repository using a clear, conventional message. Do not leave portal or API changes uncommitted unless the user explicitly asked not to commit.
