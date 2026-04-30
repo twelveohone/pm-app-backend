@@ -415,6 +415,9 @@
       <button type="button" class="admin-nav-item active" data-admin-view="overview" role="tab" aria-selected="true" id="tab-overview">
         Overview
       </button>
+      <button type="button" class="admin-nav-item" data-admin-view="sites" role="tab" aria-selected="false" id="tab-sites">
+        Sites
+      </button>
       <button type="button" class="admin-nav-item" data-admin-view="users" role="tab" aria-selected="false" id="tab-users">
         Users
       </button>
@@ -431,6 +434,39 @@
       <strong>Database summary</strong>
       <div id="stats" class="stats" style="margin-top:.5rem;"></div>
       <div id="stats-err" class="err hidden"></div>
+    </div>
+    </div>
+
+    <div id="admin-view-sites" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-sites">
+    <div class="card">
+      <strong>Sites</strong>
+      <p class="hint" style="margin-top:.35rem;">
+        Rows from the <code>sites</code> table. Blank or missing state is grouped under <strong>TN</strong> (same convention as the mobile app).
+      </p>
+      <div class="row" style="margin-top:.75rem;">
+        <div>
+          <label for="sites-state-select">State</label>
+          <select id="sites-state-select" style="min-width:260px;"></select>
+        </div>
+      </div>
+      <div id="sites-err" class="err hidden"></div>
+      <p id="sites-summary" class="hint" style="margin:.5rem 0 0;"></p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Site name</th>
+              <th>Station</th>
+              <th>City</th>
+              <th>State</th>
+              <th>WS</th>
+              <th>Kiosks</th>
+              <th>Site id</th>
+            </tr>
+          </thead>
+          <tbody id="sites-body"></tbody>
+        </table>
+      </div>
     </div>
     </div>
 
@@ -645,7 +681,7 @@
 
   function showAdminView(view) {
     var v =
-      view === 'users' || view === 'states' || view === 'inventory' ? view : 'overview';
+      view === 'users' || view === 'states' || view === 'inventory' || view === 'sites' ? view : 'overview';
     var showId =
       v === 'users'
         ? 'admin-view-users'
@@ -653,8 +689,10 @@
           ? 'admin-view-states'
           : v === 'inventory'
             ? 'admin-view-inventory'
-            : 'admin-view-overview';
-    ['admin-view-overview', 'admin-view-users', 'admin-view-states', 'admin-view-inventory'].forEach(function (id) {
+            : v === 'sites'
+              ? 'admin-view-sites'
+              : 'admin-view-overview';
+    ['admin-view-overview', 'admin-view-sites', 'admin-view-users', 'admin-view-states', 'admin-view-inventory'].forEach(function (id) {
       var el = $(id);
       if (el) el.classList.toggle('hidden', id !== showId);
     });
@@ -675,11 +713,21 @@
           show($('inv-err'), (e && e.message) || String(e));
         });
     }
+    if (v === 'sites') {
+      ensureSitesStateSelect()
+        .then(function () {
+          return refreshSitesList();
+        })
+        .catch(function (e) {
+          show($('sites-err'), (e && e.message) || String(e));
+        });
+    }
   }
 
   function initAdminViewFromHash() {
     var raw = (location.hash || '').replace(/^#/, '').toLowerCase();
-    if (raw === 'users' || raw === 'states' || raw === 'overview' || raw === 'inventory') showAdminView(raw);
+    if (raw === 'users' || raw === 'states' || raw === 'overview' || raw === 'inventory' || raw === 'sites')
+      showAdminView(raw);
     else showAdminView('overview');
   }
 
@@ -689,6 +737,83 @@
     });
   });
   window.addEventListener('hashchange', initAdminViewFromHash);
+
+  function siteRowMatchesState(site, codeUpper) {
+    var raw = site.state == null ? '' : String(site.state).trim();
+    if (codeUpper === 'TN') {
+      return !raw || raw.toUpperCase() === 'TN';
+    }
+    return raw.toUpperCase() === codeUpper;
+  }
+
+  async function ensureSitesStateSelect() {
+    var sel = $('sites-state-select');
+    if (!sel || sel.options.length > 0) return;
+    const res = await fetch('/state-configs');
+    if (!res.ok) throw new Error('Failed to load state list');
+    const rows = await res.json();
+    const list = Array.isArray(rows) ? rows.slice() : [];
+    list.sort(function (a, b) {
+      return String(a.code || '').localeCompare(String(b.code || ''));
+    });
+    for (const s of list) {
+      const o = document.createElement('option');
+      o.value = s.code || '';
+      o.textContent = (s.code || '') + ' — ' + (s.name || '');
+      sel.appendChild(o);
+    }
+    if (sel.options.length) sel.selectedIndex = 0;
+  }
+
+  async function refreshSitesList() {
+    var sel = $('sites-state-select');
+    var body = $('sites-body');
+    var summary = $('sites-summary');
+    if (!sel || !body) return;
+    show($('sites-err'), '');
+    var code = (sel.value || '').trim().toUpperCase();
+    if (!code) {
+      body.innerHTML = '';
+      if (summary) summary.textContent = '';
+      return;
+    }
+    try {
+      var all = await api('/sites', { method: 'GET' });
+      var rows = Array.isArray(all) ? all : [];
+      var filtered = rows.filter(function (s) {
+        return siteRowMatchesState(s, code);
+      });
+      filtered.sort(function (a, b) {
+        return String(a.site_name || '').localeCompare(String(b.site_name || ''), undefined, { sensitivity: 'base' });
+      });
+      if (summary) {
+        summary.textContent =
+          filtered.length +
+          ' site(s) for state ' +
+          code +
+          (filtered.length < rows.length ? ' (' + rows.length + ' total in database)' : '') +
+          '.';
+      }
+      body.innerHTML = '';
+      for (const s of filtered) {
+        var tr = document.createElement('tr');
+        var dispState = s.state != null && String(s.state).trim() !== '' ? String(s.state) : 'TN';
+        tr.innerHTML =
+          '<td>' + escapeHtml(s.site_name || '') + '</td>' +
+          '<td>' + escapeHtml(s.station || '') + '</td>' +
+          '<td>' + escapeHtml(s.city || '') + '</td>' +
+          '<td><code>' + escapeHtml(dispState) + '</code></td>' +
+          '<td>' + escapeHtml(String(s.workstations != null ? s.workstations : '')) + '</td>' +
+          '<td>' + escapeHtml(String(s.kiosks != null ? s.kiosks : '')) + '</td>' +
+          '<td><code style="font-size:.72rem">' + escapeHtml(String(s.id || '')) + '</code></td>';
+        body.appendChild(tr);
+      }
+    } catch (e) {
+      show($('sites-err'), e.message);
+      body.innerHTML = '';
+      if (summary) summary.textContent = '';
+    }
+  }
 
   async function ensureInventoryStates() {
     var sel = $('inv-state-select');
@@ -1116,6 +1241,12 @@
   if (invSel) {
     invSel.addEventListener('change', function () {
       refreshInventory();
+    });
+  }
+  var sitesSel = $('sites-state-select');
+  if (sitesSel) {
+    sitesSel.addEventListener('change', function () {
+      refreshSitesList();
     });
   }
   var invExp = $('btn-inv-export');
