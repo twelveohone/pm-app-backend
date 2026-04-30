@@ -679,6 +679,39 @@ app.get('/auth/me', authRequired, async (req, res) => {
   }
 });
 
+/** Any signed-in user may change their own password (web portal). */
+app.patch('/auth/me', authRequired, async (req, res) => {
+  const password =
+    req.body?.password !== undefined && req.body?.password !== null
+      ? String(req.body.password)
+      : undefined;
+
+  if (password === undefined) {
+    return res.status(400).json({ error: 'password is required' });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    const result = await pool.query(
+      `UPDATE users
+       SET password_hash = $1, updated_at = NOW()
+       WHERE id = $2 AND is_active = TRUE
+       RETURNING id, full_name, email, role, is_active`,
+      [passwordHash, req.user.sub]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
 app.post('/auth/users', authRequired, adminRequired, async (req, res) => {
   const fullName = String(req.body?.full_name || '').trim();
   const email = String(req.body?.email || '')
@@ -823,7 +856,7 @@ async function adminCountTable(tableKey) {
   }
 }
 
-app.get('/auth/admin/stats', authRequired, adminRequired, async (req, res) => {
+app.get('/auth/admin/stats', authRequired, async (req, res) => {
   try {
     const [users, sites, pm_sessions, pm_items, hardware_inventory] = await Promise.all([
       adminCountTable('users'),
@@ -839,7 +872,7 @@ app.get('/auth/admin/stats', authRequired, adminRequired, async (req, res) => {
   }
 });
 
-app.get('/auth/admin/hardware-inventory-summary', authRequired, adminRequired, async (req, res) => {
+app.get('/auth/admin/hardware-inventory-summary', authRequired, async (req, res) => {
   try {
     const total = await pool.query(`SELECT COUNT(*)::int AS c FROM hardware_inventory_rows`);
     const batches = await pool.query(
@@ -882,7 +915,7 @@ const HARDWARE_REGISTER_SORT_COLUMNS = {
 };
 
 /** Enterprise hardware register rows (spreadsheet import), filterable by state code (TN, MA, …). */
-app.get('/auth/admin/hardware-register', authRequired, adminRequired, async (req, res) => {
+app.get('/auth/admin/hardware-register', authRequired, async (req, res) => {
   const state = String(req.query.state || '')
     .trim()
     .toUpperCase();
@@ -977,7 +1010,7 @@ function csvEscapeCell(val) {
   return s;
 }
 
-app.get('/auth/admin/inventory', authRequired, adminRequired, async (req, res) => {
+app.get('/auth/admin/inventory', authRequired, async (req, res) => {
   try {
     const { state, rows } = await queryAdminInventory(pool, req.query.state);
     return res.json({ state, count: rows.length, rows });
@@ -990,7 +1023,7 @@ app.get('/auth/admin/inventory', authRequired, adminRequired, async (req, res) =
   }
 });
 
-app.get('/auth/admin/inventory-export', authRequired, adminRequired, async (req, res) => {
+app.get('/auth/admin/inventory-export', authRequired, async (req, res) => {
   try {
     const { state, rows } = await queryAdminInventory(pool, req.query.state);
     const headers = [

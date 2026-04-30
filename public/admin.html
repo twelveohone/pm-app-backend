@@ -386,14 +386,18 @@
         align-items: stretch;
       }
     }
+
+    body.portal-staff:not(.portal-admin) .admin-only {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
   <div id="login-panel" class="card">
     <div class="login-brand">PM Tracker</div>
-    <h1>Admin sign in</h1>
-    <p style="margin:0 0 1rem;color:#64748b;font-size:.9rem;line-height:1.45;">Use an account with the <strong>admin</strong> role.</p>
+    <h1>Sign in</h1>
+    <p style="margin:0 0 1rem;color:#64748b;font-size:.9rem;line-height:1.45;">Use your PM Tracker account. Admins can manage users and configuration; everyone else can browse data and update their password.</p>
     <div class="row">
       <div>
         <label for="email">Email</label>
@@ -411,8 +415,8 @@
   <div id="app-panel" class="hidden">
     <div class="toolbar">
       <div class="toolbar-text">
-        <h1>PM Admin</h1>
-        <p class="tagline">Backend administration — users, sites, state configuration, and hardware register.</p>
+        <h1 id="portal-title">PM Portal</h1>
+        <p class="tagline" id="portal-tagline">View sites, summaries, and hardware. Change your password on the Account tab.</p>
       </div>
       <button type="button" class="secondary" id="btn-logout">Sign out</button>
     </div>
@@ -424,8 +428,11 @@
       <button type="button" class="admin-nav-item" data-admin-view="sites" role="tab" aria-selected="false" id="tab-sites">
         Sites
       </button>
-      <button type="button" class="admin-nav-item" data-admin-view="users" role="tab" aria-selected="false" id="tab-users">
+      <button type="button" class="admin-nav-item admin-only" data-admin-view="users" role="tab" aria-selected="false" id="tab-users">
         Users
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-view="account" role="tab" aria-selected="false" id="tab-account">
+        Account
       </button>
       <button type="button" class="admin-nav-item" data-admin-view="inventory" role="tab" aria-selected="false" id="tab-inventory">
         Hardware
@@ -448,7 +455,7 @@
       <strong>Sites</strong>
       <p class="hint" style="margin-top:.35rem;">
         Rows from the <code>sites</code> table. Blank or missing state is grouped under <strong>TN</strong> (same convention as the mobile app).
-        Use <strong>Delete</strong> to remove a site from the database (PM sessions and line items for that site are removed). This matches removal from the mobile app.
+        <span class="admin-only">Use <strong>Delete</strong> to remove a site from the database (PM sessions and line items for that site are removed). This matches removal from the mobile app.</span>
       </p>
       <div class="row" style="margin-top:.75rem;">
         <div>
@@ -469,7 +476,7 @@
               <th>WS</th>
               <th>Kiosks</th>
               <th>Site id</th>
-              <th>Actions</th>
+              <th class="admin-only">Actions</th>
             </tr>
           </thead>
           <tbody id="sites-body"></tbody>
@@ -478,9 +485,14 @@
     </div>
     </div>
 
-    <div id="admin-view-users" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-users">
+    <div id="admin-view-users" class="admin-view admin-only hidden" role="tabpanel" aria-labelledby="tab-users">
     <div class="card">
       <strong>Users</strong>
+      <p class="hint" style="margin-top:.35rem;line-height:1.5;">
+        <strong>tech</strong> — Field technicians: mobile app access to sync sites, PM sessions, and checklist data. Same API permissions as <strong>manager</strong> today.<br />
+        <strong>manager</strong> — Same backend access as tech; use to mark leads or supervisors. (Reserved for future reporting or approvals.)<br />
+        <strong>admin</strong> — Web portal: user management, state/device configuration, inventory summaries, and deleting sites from this UI. Mobile app site add/edit/remove stays available to all signed-in roles.
+      </p>
       <div id="users-err" class="err hidden"></div>
       <div class="table-scroll">
         <table>
@@ -508,6 +520,23 @@
         <button type="button" id="btn-create">Create</button>
       </div>
       <div id="create-err" class="err hidden"></div>
+    </div>
+    </div>
+
+    <div id="admin-view-account" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-account">
+    <div class="card">
+      <strong>Your account</strong>
+      <p class="hint" style="margin-top:.35rem;">
+        Signed in as <strong id="account-email">—</strong> · Role: <code id="account-role">—</code>
+      </p>
+      <p class="hint">Choose a strong password you do not reuse on other sites.</p>
+      <div class="row" style="margin-top:.75rem;">
+        <div><label for="acct-pw1">New password</label><input id="acct-pw1" type="password" autocomplete="new-password" /></div>
+        <div><label for="acct-pw2">Confirm</label><input id="acct-pw2" type="password" autocomplete="new-password" /></div>
+        <button type="button" id="btn-acct-pw">Update password</button>
+      </div>
+      <div id="acct-pw-err" class="err hidden"></div>
+      <p id="acct-pw-ok" class="hint hidden" style="margin-top:.5rem;color:#166534;font-weight:600;">Password updated.</p>
     </div>
     </div>
 
@@ -575,7 +604,7 @@
         Use <strong>Add state</strong> to create a configuration, or <strong>Edit</strong> on a row to change an existing one.
       </p>
       <div id="statecfg-list-err" class="err hidden"></div>
-      <div class="row" style="margin-top:.75rem; justify-content:flex-end;">
+      <div class="row admin-only" style="margin-top:.75rem; justify-content:flex-end;">
         <button type="button" id="btn-state-add">＋ Add state</button>
       </div>
       <div class="table-scroll" style="margin-top:.65rem;">
@@ -586,13 +615,13 @@
               <th>Name</th>
               <th>Workstation #</th>
               <th>Non-WS #</th>
-              <th></th>
+              <th class="admin-only">Actions</th>
             </tr>
           </thead>
           <tbody id="states-body"></tbody>
         </table>
       </div>
-      <div id="state-form-panel" class="state-form-panel hidden" role="region" aria-labelledby="state-form-title">
+      <div id="state-form-panel" class="state-form-panel admin-only hidden" role="region" aria-labelledby="state-form-title">
       <strong id="state-form-title">Add state</strong>
       <div class="row" style="margin-top:.5rem;">
         <div>
@@ -674,6 +703,25 @@
   const ADMIN_ID_KEY = 'pm_admin_uid';
   const $ = (id) => document.getElementById(id);
 
+  /** @type {string|null} */
+  var portalRole = null;
+
+  function isPortalAdmin() {
+    return portalRole === 'admin';
+  }
+
+  function applyPortalRoleUI() {
+    document.body.classList.toggle('portal-admin', isPortalAdmin());
+    var tag = $('portal-tagline');
+    if (tag) {
+      tag.textContent = isPortalAdmin()
+        ? 'Backend administration — users, sites, state configuration, and hardware register.'
+        : 'View sites, summaries, and hardware. Change your password on the Account tab. Ask an admin for user or configuration changes.';
+    }
+    var h = $('portal-title');
+    if (h) h.textContent = isPortalAdmin() ? 'PM Admin' : 'PM Portal';
+  }
+
   function adminUserId() {
     return sessionStorage.getItem(ADMIN_ID_KEY) || '';
   }
@@ -704,11 +752,22 @@
   function panel(login) {
     $('login-panel').classList.toggle('hidden', !login);
     $('app-panel').classList.toggle('hidden', login);
+    if (!login) {
+      document.body.classList.add('portal-staff');
+      applyPortalRoleUI();
+    } else {
+      document.body.classList.remove('portal-staff');
+      document.body.classList.remove('portal-admin');
+      portalRole = null;
+    }
   }
 
   function showAdminView(view) {
     var v =
-      view === 'users' || view === 'states' || view === 'inventory' || view === 'sites' ? view : 'overview';
+      view === 'users' || view === 'states' || view === 'inventory' || view === 'sites' || view === 'account'
+        ? view
+        : 'overview';
+    if (v === 'users' && !isPortalAdmin()) v = 'overview';
     var showId =
       v === 'users'
         ? 'admin-view-users'
@@ -718,8 +777,17 @@
             ? 'admin-view-inventory'
             : v === 'sites'
               ? 'admin-view-sites'
-              : 'admin-view-overview';
-    ['admin-view-overview', 'admin-view-sites', 'admin-view-users', 'admin-view-states', 'admin-view-inventory'].forEach(function (id) {
+              : v === 'account'
+                ? 'admin-view-account'
+                : 'admin-view-overview';
+    [
+      'admin-view-overview',
+      'admin-view-sites',
+      'admin-view-users',
+      'admin-view-account',
+      'admin-view-states',
+      'admin-view-inventory',
+    ].forEach(function (id) {
       var el = $(id);
       if (el) el.classList.toggle('hidden', id !== showId);
     });
@@ -753,6 +821,26 @@
     if (v === 'states') {
       clearStateForm();
     }
+    if (v === 'account') {
+      refreshAccountPanel();
+    }
+  }
+
+  async function refreshAccountPanel() {
+    show($('acct-pw-err'), '');
+    var ok = $('acct-pw-ok');
+    if (ok) ok.classList.add('hidden');
+    try {
+      const me = await api('/auth/me', { method: 'GET' });
+      var em = $('account-email');
+      var rl = $('account-role');
+      if (em) em.textContent = me.email || '—';
+      if (rl) rl.textContent = me.role || '—';
+      if (me && me.role) portalRole = me.role;
+      applyPortalRoleUI();
+    } catch (e) {
+      if ($('account-email')) $('account-email').textContent = '—';
+    }
   }
 
   function showStateFormPanel() {
@@ -767,7 +855,14 @@
 
   function initAdminViewFromHash() {
     var raw = (location.hash || '').replace(/^#/, '').toLowerCase();
-    if (raw === 'users' || raw === 'states' || raw === 'overview' || raw === 'inventory' || raw === 'sites')
+    if (
+      raw === 'users' ||
+      raw === 'states' ||
+      raw === 'overview' ||
+      raw === 'inventory' ||
+      raw === 'sites' ||
+      raw === 'account'
+    )
       showAdminView(raw);
     else showAdminView('overview');
   }
@@ -860,6 +955,9 @@
       for (const s of filtered) {
         var tr = document.createElement('tr');
         var dispState = s.state != null && String(s.state).trim() !== '' ? String(s.state) : 'TN';
+        var actionsCell = isPortalAdmin()
+          ? '<td><div class="act-btns"><button type="button" class="danger btn-site-del">Delete</button></div></td>'
+          : '';
         tr.innerHTML =
           '<td>' + escapeHtml(s.site_name || '') + '</td>' +
           '<td>' + escapeHtml(s.station || '') + '</td>' +
@@ -868,7 +966,7 @@
           '<td>' + escapeHtml(String(s.workstations != null ? s.workstations : '')) + '</td>' +
           '<td>' + escapeHtml(String(s.kiosks != null ? s.kiosks : '')) + '</td>' +
           '<td><code style="font-size:.72rem">' + escapeHtml(String(s.id || '')) + '</code></td>' +
-          '<td><div class="act-btns"><button type="button" class="danger btn-site-del">Delete</button></div></td>';
+          actionsCell;
         var delBtn = tr.querySelector('.btn-site-del');
         if (delBtn) {
           delBtn.addEventListener('click', function () {
@@ -1208,14 +1306,17 @@
         const tr = document.createElement('tr');
         var podN = Array.isArray(s.pod_devices) ? s.pod_devices.length : 0;
         var kN = Array.isArray(s.kiosk_devices) ? s.kiosk_devices.length : 0;
+        var act = isPortalAdmin()
+          ? '<td><div class="act-btns">' +
+            '<button type="button" class="secondary btn-state-edit" data-code="' + escapeHtml(s.code) + '">Edit</button>' +
+            '<button type="button" class="danger btn-state-del" data-code="' + escapeHtml(s.code) + '">Delete</button>' +
+            '</div></td>'
+          : '';
         tr.innerHTML =
           '<td><code>' + escapeHtml(s.code) + '</code></td>' +
           '<td>' + escapeHtml(s.name) + '</td>' +
           '<td>' + podN + '</td><td>' + kN + '</td>' +
-          '<td><div class="act-btns">' +
-          '<button type="button" class="secondary btn-state-edit" data-code="' + escapeHtml(s.code) + '">Edit</button>' +
-          '<button type="button" class="danger btn-state-del" data-code="' + escapeHtml(s.code) + '">Delete</button>' +
-          '</div></td>';
+          act;
         tbody.appendChild(tr);
       }
       tbody.querySelectorAll('.btn-state-edit').forEach(function (btn) {
@@ -1247,6 +1348,7 @@
   }
 
   async function refreshUsers() {
+    if (!isPortalAdmin()) return;
     show($('users-err'), '');
     const body = $('users-body');
     body.innerHTML = '';
@@ -1340,15 +1442,15 @@
         headers: { 'Content-Type': 'application/json' },
       });
       if (!data.token || !data.user) throw new Error('Invalid response');
-      if (data.user.role !== 'admin') throw new Error('This account is not an admin.');
       sessionStorage.setItem(TOKEN_KEY, data.token);
       if (data.user.id) sessionStorage.setItem(ADMIN_ID_KEY, data.user.id);
+      portalRole = data.user.role || null;
       panel(false);
       try {
         await refreshStats();
-        await refreshUsers();
+        if (isPortalAdmin()) await refreshUsers();
         await refreshStates();
-        loadDeviceTypesList();
+        if (isPortalAdmin()) loadDeviceTypesList();
         initAdminViewFromHash();
       } catch (err) {
         sessionStorage.removeItem(TOKEN_KEY);
@@ -1368,6 +1470,29 @@
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(ADMIN_ID_KEY);
     panel(true);
+  });
+
+  $('btn-acct-pw').addEventListener('click', async function () {
+    show($('acct-pw-err'), '');
+    $('acct-pw-ok').classList.add('hidden');
+    var a = ($('acct-pw1').value || '').trim();
+    var b = ($('acct-pw2').value || '').trim();
+    if (a.length < 8) {
+      show($('acct-pw-err'), 'Password must be at least 8 characters.');
+      return;
+    }
+    if (a !== b) {
+      show($('acct-pw-err'), 'Passwords do not match.');
+      return;
+    }
+    try {
+      await api('/auth/me', { method: 'PATCH', body: JSON.stringify({ password: a }) });
+      $('acct-pw1').value = '';
+      $('acct-pw2').value = '';
+      $('acct-pw-ok').classList.remove('hidden');
+    } catch (e) {
+      show($('acct-pw-err'), e.message);
+    }
   });
 
   var sitesSel = $('sites-state-select');
@@ -1529,20 +1654,21 @@
 
   (async function boot() {
     if (!token()) return;
-    panel(false);
     try {
       const me = await api('/auth/me', { method: 'GET' });
-      if (me && me.id && me.role === 'admin') sessionStorage.setItem(ADMIN_ID_KEY, me.id);
-      else {
+      if (!me || !me.id || !me.is_active) {
         sessionStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(ADMIN_ID_KEY);
         panel(true);
         return;
       }
+      sessionStorage.setItem(ADMIN_ID_KEY, me.id);
+      portalRole = me.role || null;
+      panel(false);
       await refreshStats();
-      await refreshUsers();
+      if (isPortalAdmin()) await refreshUsers();
       await refreshStates();
-      loadDeviceTypesList();
+      if (isPortalAdmin()) loadDeviceTypesList();
       initAdminViewFromHash();
     } catch (e) {
       sessionStorage.removeItem(TOKEN_KEY);
