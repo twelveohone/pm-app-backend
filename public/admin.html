@@ -751,7 +751,6 @@
         <table>
           <thead>
             <tr>
-              <th>Source</th>
               <th>Site / location</th>
               <th>State</th>
               <th>Item</th>
@@ -1511,7 +1510,6 @@
               '<button type="button" class="danger btn-inv-hw-del">Delete</button></td>';
           }
         }
-        var srcLabel = r.source === 'pm' ? 'Mobile PM' : 'Register';
         var where = r.source === 'pm' ? r.site_name : r.location;
         var st = r.source === 'pm' ? r.state : r.state_code;
         var item = r.source === 'pm' ? r.device_type : r.model;
@@ -1520,15 +1518,12 @@
           r.source === 'pm'
             ? escapeHtml(String(r.technician_name || '')) +
               (r.notes ? ' · ' + escapeHtml(String(r.notes)) : '') +
-              ' · c/d ' +
-              (r.cleaned ? '1' : '0') +
-              '/' +
+              ' · damaged ' +
               (r.damaged ? '1' : '0')
             : escapeHtml(String(r.model_category || '')) +
               (r.import_batch ? ' · batch ' + escapeHtml(String(r.import_batch)) : '') +
               (r.state_name ? ' · file state ' + escapeHtml(String(r.state_name)) : '');
         tr.innerHTML =
-          '<td><code>' + escapeHtml(srcLabel) + '</code></td>' +
           '<td>' + escapeHtml(String(where || '')) + '</td>' +
           '<td><code>' + escapeHtml(String(st || '')) + '</code></td>' +
           '<td><code>' + escapeHtml(String(item || '')) + '</code></td>' +

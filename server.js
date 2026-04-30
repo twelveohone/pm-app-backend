@@ -1385,7 +1385,7 @@ app.get('/auth/inventory-combined-export', authRequired, async (req, res) => {
       const serial = row.source === 'pm' ? row.serial : row.serial_number;
       const meta =
         row.source === 'pm'
-          ? `tech:${row.technician_name || ''}; notes:${row.notes || ''}; cleaned:${row.cleaned}; damaged:${row.damaged}`
+          ? `tech:${row.technician_name || ''}; notes:${row.notes || ''}; damaged:${row.damaged}`
           : `category:${row.model_category || ''}; batch:${row.import_batch || ''}; file_state:${row.state_name || ''}`;
       const rid = row.source === 'pm' ? row.item_id : row.id;
       const st = row.source === 'pm' ? row.state : row.state_code;
