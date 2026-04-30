@@ -509,9 +509,11 @@
     <div class="card">
       <strong>Hardware inventory (.xlsx)</strong>
       <p class="hint" style="margin-top:.35rem;">
-        Upload the enterprise <strong>hardware asset register</strong> (Asset Tag, Model, Location, …). Rows are stored in
-        <code>hardware_inventory_rows</code> on this server. This is <strong>not</strong> the same as the &quot;Inventory by state&quot;
-        table below, which lists <strong>PM session checklist line items</strong> from field visits — that grid stays empty until techs run PMs in the app.
+        Upload the enterprise <strong>hardware asset register</strong> (Asset Tag, Model, Location, …). The spreadsheet
+        <strong>State</strong> column is stored as <code>state_name</code> and matched to a <strong>state code</strong>
+        (<code>state_code</code>, e.g. TN) using <strong>State &amp; devices</strong> configuration (code + display name). Rows are stored in
+        <code>hardware_inventory_rows</code>. Use <strong>Enterprise hardware by state</strong> below to browse them by TN / MA.
+        The <strong>PM inventory</strong> section further down is checklist data from the app, not this spreadsheet.
       </p>
       <p id="hw-inv-summary" class="hint" style="margin-top:.5rem;"></p>
       <div class="row" style="margin-top:.75rem; align-items:flex-start;">
@@ -539,6 +541,39 @@
       <button type="button" id="btn-hw-inv-import">Import to database</button>
       <div id="hw-inv-err" class="err hidden"></div>
       <p id="hw-inv-ok" class="hint hidden" style="margin-top:.75rem;color:#166534;font-weight:600;"></p>
+    </div>
+    <div class="card">
+      <strong>Enterprise hardware by state</strong>
+      <p class="hint" style="margin-top:.35rem;">
+        Filter imported register rows by <code>state_code</code> (same TN / MA codes as elsewhere). Rows with a State cell that
+        doesn&apos;t match any configured state stay <code>state_code</code> empty and won&apos;t appear here until you fix the sheet or add a state config.
+      </p>
+      <div class="row" style="margin-top:.75rem;">
+        <div>
+          <label for="hw-reg-state-select">State</label>
+          <select id="hw-reg-state-select" style="min-width:240px;"></select>
+        </div>
+        <button type="button" class="secondary" id="btn-hw-reg-load">Load rows</button>
+      </div>
+      <div id="hw-reg-err" class="err hidden"></div>
+      <p id="hw-reg-summary" class="hint" style="margin:.5rem 0 0;"></p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Asset tag</th>
+              <th>Serial</th>
+              <th>Model</th>
+              <th>Category</th>
+              <th>Location</th>
+              <th>State (file)</th>
+              <th>Code</th>
+              <th>Batch</th>
+            </tr>
+          </thead>
+          <tbody id="hw-reg-body"></tbody>
+        </table>
+      </div>
     </div>
     <div class="card">
       <strong>PM inventory by state</strong>
@@ -749,6 +784,13 @@
           show($('inv-err'), (e && e.message) || String(e));
         });
       refreshHardwareInventorySummary().catch(function () {});
+      ensureHardwareRegStateSelect()
+        .then(function () {
+          return refreshHardwareRegister();
+        })
+        .catch(function (e) {
+          show($('hw-reg-err'), (e && e.message) || String(e));
+        });
     }
     if (v === 'sites') {
       ensureSitesStateSelect()
@@ -880,23 +922,76 @@
     }
   }
 
+  function fillStateSelectFromConfigs(sel) {
+    if (!sel || sel.options.length > 0) return Promise.resolve();
+    return fetch('/state-configs')
+      .then(function (res) {
+        if (!res.ok) throw new Error('Failed to load state list');
+        return res.json();
+      })
+      .then(function (rows) {
+        const list = Array.isArray(rows) ? rows.slice() : [];
+        list.sort(function (a, b) {
+          return String(a.code || '').localeCompare(String(b.code || ''));
+        });
+        for (const s of list) {
+          const o = document.createElement('option');
+          o.value = s.code || '';
+          o.textContent = (s.code || '') + ' — ' + (s.name || '');
+          sel.appendChild(o);
+        }
+        if (sel.options.length) sel.selectedIndex = 0;
+      });
+  }
+
   async function ensureInventoryStates() {
     var sel = $('inv-state-select');
-    if (!sel || sel.options.length > 0) return;
-    const res = await fetch('/state-configs');
-    if (!res.ok) throw new Error('Failed to load state list');
-    const rows = await res.json();
-    const list = Array.isArray(rows) ? rows.slice() : [];
-    list.sort(function (a, b) {
-      return String(a.code || '').localeCompare(String(b.code || ''));
-    });
-    for (const s of list) {
-      const o = document.createElement('option');
-      o.value = s.code || '';
-      o.textContent = (s.code || '') + ' — ' + (s.name || '');
-      sel.appendChild(o);
+    await fillStateSelectFromConfigs(sel);
+  }
+
+  async function ensureHardwareRegStateSelect() {
+    var sel = $('hw-reg-state-select');
+    await fillStateSelectFromConfigs(sel);
+  }
+
+  async function refreshHardwareRegister() {
+    var sel = $('hw-reg-state-select');
+    var body = $('hw-reg-body');
+    var summary = $('hw-reg-summary');
+    if (!sel || !body) return;
+    show($('hw-reg-err'), '');
+    var code = (sel.value || '').trim();
+    if (!code) {
+      body.innerHTML = '';
+      if (summary) summary.textContent = '';
+      return;
     }
-    if (sel.options.length) sel.selectedIndex = 0;
+    try {
+      var data = await api('/auth/admin/hardware-register?state=' + encodeURIComponent(code), { method: 'GET' });
+      var rows = data.rows || [];
+      if (summary) {
+        summary.textContent =
+          rows.length + ' hardware register row(s) for state ' + (data.state || code) + ' (cap 8,000).';
+      }
+      body.innerHTML = '';
+      for (const r of rows) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escapeHtml(r.asset_tag || '') + '</td>' +
+          '<td>' + escapeHtml(r.serial_number || '') + '</td>' +
+          '<td>' + escapeHtml(r.model || '') + '</td>' +
+          '<td>' + escapeHtml(r.model_category || '') + '</td>' +
+          '<td>' + escapeHtml(r.location || '') + '</td>' +
+          '<td>' + escapeHtml(r.state_name || '') + '</td>' +
+          '<td><code>' + escapeHtml(String(r.state_code || '')) + '</code></td>' +
+          '<td><code style="font-size:.72rem">' + escapeHtml(String(r.import_batch || '')) + '</code></td>';
+        body.appendChild(tr);
+      }
+    } catch (e) {
+      show($('hw-reg-err'), e.message);
+      body.innerHTML = '';
+      if (summary) summary.textContent = '';
+    }
   }
 
   function fmtTs(iso) {
@@ -991,6 +1086,24 @@
               .join(', ') +
             (data.batches.length > 12 ? ' …' : '') +
             '.'
+        );
+      }
+      if (data.byState && data.byState.length) {
+        parts.push(
+          ' By state code: ' +
+            data.byState
+              .map(function (x) {
+                return '<code>' + escapeHtml(String(x.code)) + '</code> (' + x.count + ')';
+              })
+              .join(', ') +
+            '.'
+        );
+      }
+      if (data.rowsWithoutStateCode > 0) {
+        parts.push(
+          ' <strong>' +
+            data.rowsWithoutStateCode +
+            '</strong> row(s) have no <code>state_code</code> (spreadsheet State didn&apos;t match a configured state).'
         );
       }
       el.innerHTML = parts.join('');
@@ -1342,6 +1455,18 @@
       refreshSitesList();
     });
   }
+  var hwRegSel = $('hw-reg-state-select');
+  if (hwRegSel) {
+    hwRegSel.addEventListener('change', function () {
+      refreshHardwareRegister();
+    });
+  }
+  var hwRegLoad = $('btn-hw-reg-load');
+  if (hwRegLoad) {
+    hwRegLoad.addEventListener('click', function () {
+      refreshHardwareRegister();
+    });
+  }
   var invExp = $('btn-inv-export');
   if (invExp) {
     invExp.addEventListener('click', async function () {
@@ -1424,6 +1549,7 @@
         }
         await refreshStats();
         await refreshHardwareInventorySummary();
+        await refreshHardwareRegister();
       } catch (e) {
         show(errEl, (e && e.message) || String(e));
       } finally {

@@ -240,6 +240,7 @@ async function ensureHardwareInventoryTable() {
   `);
   await pool.query(`
     ALTER TABLE hardware_inventory_rows
+      ADD COLUMN IF NOT EXISTS state_code TEXT,
       ADD COLUMN IF NOT EXISTS pm_cleaned SMALLINT,
       ADD COLUMN IF NOT EXISTS pm_damaged SMALLINT,
       ADD COLUMN IF NOT EXISTS pm_notes TEXT,
@@ -250,6 +251,9 @@ async function ensureHardwareInventoryTable() {
     `CREATE INDEX IF NOT EXISTS idx_hardware_inventory_batch ON hardware_inventory_rows (import_batch)`
   );
   await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_hardware_inventory_state_code ON hardware_inventory_rows (state_code)`
+  );
+  await pool.query(
     `CREATE INDEX IF NOT EXISTS idx_hardware_inventory_location ON hardware_inventory_rows (location)`
   );
   await pool.query(
@@ -258,6 +262,26 @@ async function ensureHardwareInventoryTable() {
   await pool.query(
     `CREATE INDEX IF NOT EXISTS idx_hardware_inventory_asset_tag ON hardware_inventory_rows (asset_tag)`
   );
+}
+
+async function backfillHardwareInventoryStateCodes() {
+  try {
+    const r = await pool.query(`
+      UPDATE hardware_inventory_rows r
+      SET state_code = c.code
+      FROM pm_state_configs c
+      WHERE r.state_code IS NULL
+        AND (
+          LOWER(TRIM(COALESCE(r.state_name, ''))) = LOWER(TRIM(c.name))
+          OR LOWER(TRIM(COALESCE(r.state_name, ''))) = LOWER(TRIM(c.code))
+        )
+    `);
+    if (r.rowCount > 0) {
+      console.log(`Backfilled state_code on ${r.rowCount} hardware_inventory row(s)`);
+    }
+  } catch (err) {
+    console.error('backfillHardwareInventoryStateCodes', err);
+  }
 }
 
 /**
@@ -845,10 +869,51 @@ app.get('/auth/admin/hardware-inventory-summary', authRequired, adminRequired, a
        ORDER BY MAX(created_at) DESC
        LIMIT 50`
     );
-    return res.json({ total: total.rows[0].c, batches: batches.rows });
+    const byState = await pool.query(
+      `SELECT state_code AS code, COUNT(*)::int AS count
+       FROM hardware_inventory_rows
+       WHERE state_code IS NOT NULL AND TRIM(state_code) <> ''
+       GROUP BY state_code
+       ORDER BY state_code`
+    );
+    const noCode = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM hardware_inventory_rows
+       WHERE state_code IS NULL OR TRIM(COALESCE(state_code, '')) = ''`
+    );
+    return res.json({
+      total: total.rows[0].c,
+      batches: batches.rows,
+      byState: byState.rows,
+      rowsWithoutStateCode: noCode.rows[0].c,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to load hardware inventory summary' });
+  }
+});
+
+/** Enterprise hardware register rows (spreadsheet import), filterable by state code (TN, MA, …). */
+app.get('/auth/admin/hardware-register', authRequired, adminRequired, async (req, res) => {
+  const state = String(req.query.state || '')
+    .trim()
+    .toUpperCase();
+  const limit = Math.min(15000, Math.max(1, Number(req.query.limit) || 8000));
+  if (!state || !/^[A-Z0-9]{2,10}$/.test(state)) {
+    return res.status(400).json({ error: 'state query param is required (e.g. TN)' });
+  }
+  try {
+    const result = await pool.query(
+      `SELECT asset_tag, serial_number, model, model_category, location, state_name, state_code, import_batch
+       FROM hardware_inventory_rows
+       WHERE state_code = $1
+       ORDER BY location NULLS LAST, asset_tag NULLS LAST, serial_number NULLS LAST
+       LIMIT $2`,
+      [state, limit]
+    );
+    return res.json({ state, count: result.rows.length, rows: result.rows });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load hardware register' });
   }
 });
 
@@ -1426,6 +1491,7 @@ async function start() {
     await ensureSitesTable();
     await ensurePmSessionsAndItemsTables();
     await ensureHardwareInventoryTable();
+    await backfillHardwareInventoryStateCodes();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
