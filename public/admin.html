@@ -553,6 +553,24 @@
           <label for="hw-reg-state-select">State</label>
           <select id="hw-reg-state-select" style="min-width:240px;"></select>
         </div>
+        <div>
+          <label for="hw-reg-sort-select">Sort by</label>
+          <select id="hw-reg-sort-select" style="min-width:200px;">
+            <option value="category">Model category</option>
+            <option value="location">Location</option>
+            <option value="asset_tag">Asset tag</option>
+            <option value="serial">Serial number</option>
+            <option value="model">Model</option>
+            <option value="batch">Import batch</option>
+          </select>
+        </div>
+        <div>
+          <label for="hw-reg-dir-select">Order</label>
+          <select id="hw-reg-dir-select" style="min-width:140px;">
+            <option value="asc">A → Z / low → high</option>
+            <option value="desc">Z → A / high → low</option>
+          </select>
+        </div>
         <button type="button" class="secondary" id="btn-hw-reg-load">Load rows</button>
       </div>
       <div id="hw-reg-err" class="err hidden"></div>
@@ -967,11 +985,30 @@
       return;
     }
     try {
-      var data = await api('/auth/admin/hardware-register?state=' + encodeURIComponent(code), { method: 'GET' });
+      var sortSel = $('hw-reg-sort-select');
+      var dirSel = $('hw-reg-dir-select');
+      var sort = sortSel && sortSel.value ? String(sortSel.value) : 'category';
+      var dir = dirSel && dirSel.value ? String(dirSel.value) : 'asc';
+      var data = await api(
+        '/auth/admin/hardware-register?state=' +
+          encodeURIComponent(code) +
+          '&sort=' +
+          encodeURIComponent(sort) +
+          '&dir=' +
+          encodeURIComponent(dir),
+        { method: 'GET' }
+      );
       var rows = data.rows || [];
       if (summary) {
         summary.textContent =
-          rows.length + ' hardware register row(s) for state ' + (data.state || code) + ' (cap 8,000).';
+          rows.length +
+          ' hardware register row(s) for state ' +
+          (data.state || code) +
+          ', sorted by ' +
+          (data.sort || 'category') +
+          ' (' +
+          (data.dir === 'desc' ? 'desc' : 'asc') +
+          ').';
       }
       body.innerHTML = '';
       for (const r of rows) {
@@ -1464,6 +1501,18 @@
   var hwRegLoad = $('btn-hw-reg-load');
   if (hwRegLoad) {
     hwRegLoad.addEventListener('click', function () {
+      refreshHardwareRegister();
+    });
+  }
+  var hwRegSort = $('hw-reg-sort-select');
+  if (hwRegSort) {
+    hwRegSort.addEventListener('change', function () {
+      refreshHardwareRegister();
+    });
+  }
+  var hwRegDir = $('hw-reg-dir-select');
+  if (hwRegDir) {
+    hwRegDir.addEventListener('change', function () {
       refreshHardwareRegister();
     });
   }

@@ -892,6 +892,15 @@ app.get('/auth/admin/hardware-inventory-summary', authRequired, adminRequired, a
   }
 });
 
+const HARDWARE_REGISTER_SORT_COLUMNS = {
+  category: 'model_category',
+  location: 'location',
+  asset_tag: 'asset_tag',
+  serial: 'serial_number',
+  model: 'model',
+  batch: 'import_batch',
+};
+
 /** Enterprise hardware register rows (spreadsheet import), filterable by state code (TN, MA, …). */
 app.get('/auth/admin/hardware-register', authRequired, adminRequired, async (req, res) => {
   const state = String(req.query.state || '')
@@ -901,16 +910,27 @@ app.get('/auth/admin/hardware-register', authRequired, adminRequired, async (req
   if (!state || !/^[A-Z0-9]{2,10}$/.test(state)) {
     return res.status(400).json({ error: 'state query param is required (e.g. TN)' });
   }
+  const sortKey = String(req.query.sort || 'category').toLowerCase();
+  const sortCol = HARDWARE_REGISTER_SORT_COLUMNS[sortKey] || HARDWARE_REGISTER_SORT_COLUMNS.category;
+  const dirRaw = String(req.query.dir || 'asc').toLowerCase();
+  const dir = dirRaw === 'desc' ? 'DESC' : 'ASC';
+  const tiebreak = `model_category ASC NULLS LAST, location ASC NULLS LAST, asset_tag ASC NULLS LAST, serial_number ASC NULLS LAST`;
   try {
     const result = await pool.query(
       `SELECT asset_tag, serial_number, model, model_category, location, state_name, state_code, import_batch
        FROM hardware_inventory_rows
        WHERE state_code = $1
-       ORDER BY location NULLS LAST, asset_tag NULLS LAST, serial_number NULLS LAST
+       ORDER BY ${sortCol} ${dir} NULLS LAST, ${tiebreak}
        LIMIT $2`,
       [state, limit]
     );
-    return res.json({ state, count: result.rows.length, rows: result.rows });
+    return res.json({
+      state,
+      sort: sortKey in HARDWARE_REGISTER_SORT_COLUMNS ? sortKey : 'category',
+      dir: dir === 'DESC' ? 'desc' : 'asc',
+      count: result.rows.length,
+      rows: result.rows,
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to load hardware register' });
