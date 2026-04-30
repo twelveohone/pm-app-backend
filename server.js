@@ -315,6 +315,48 @@ async function ensureSitesTable() {
 }
 
 /**
+ * PM session + line-item tables (mobile sync, import-session, admin inventory).
+ * Render / fresh Postgres DBs only had `sites` via ensureSitesTable — without these,
+ * admin inventory and PM APIs fail with "relation pm_items does not exist".
+ */
+async function ensurePmSessionsAndItemsTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pm_sessions (
+      id TEXT PRIMARY KEY NOT NULL,
+      site_id TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+      technician_name TEXT NOT NULL,
+      started_at TIMESTAMPTZ NOT NULL,
+      pods_count INTEGER NOT NULL DEFAULT 0,
+      kiosks_count INTEGER NOT NULL DEFAULT 0,
+      first_pod_system TEXT,
+      first_kiosk_system TEXT,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS pm_items (
+      id TEXT PRIMARY KEY NOT NULL,
+      session_id TEXT NOT NULL REFERENCES pm_sessions(id) ON DELETE CASCADE,
+      unit_type TEXT NOT NULL,
+      unit_index INTEGER NOT NULL,
+      device_type TEXT NOT NULL,
+      cleaned SMALLINT NOT NULL DEFAULT 0,
+      damaged SMALLINT NOT NULL DEFAULT 0,
+      notes TEXT,
+      serial TEXT,
+      asset_tag TEXT,
+      printer_master_pod SMALLINT,
+      created_at TIMESTAMPTZ NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL
+    )
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_pm_items_session_unit ON pm_items (session_id, unit_type, unit_index)`
+  );
+}
+
+/**
  * Upsert a site row (used by PUT /sites and import-session).
  * @param {import('pg').PoolClient | import('pg').Pool} q
  */
@@ -1276,6 +1318,7 @@ async function start() {
     await ensureAuthTables();
     await ensurePmStateConfigs();
     await ensureSitesTable();
+    await ensurePmSessionsAndItemsTables();
     await ensureHardwareInventoryTable();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
