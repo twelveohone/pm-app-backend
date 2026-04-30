@@ -509,10 +509,11 @@
     <div class="card">
       <strong>Hardware inventory (.xlsx)</strong>
       <p class="hint" style="margin-top:.35rem;">
-        Upload the enterprise hardware register (Asset Tag, Model, Location, …). Inserts into <code>hardware_inventory_rows</code> on
-        <strong>this server&apos;s database</strong> (e.g. Render). Use this instead of a local CLI import when you don&apos;t have
-        <code>DATABASE_URL</code> on your PC.
+        Upload the enterprise <strong>hardware asset register</strong> (Asset Tag, Model, Location, …). Rows are stored in
+        <code>hardware_inventory_rows</code> on this server. This is <strong>not</strong> the same as the &quot;Inventory by state&quot;
+        table below, which lists <strong>PM session checklist line items</strong> from field visits — that grid stays empty until techs run PMs in the app.
       </p>
+      <p id="hw-inv-summary" class="hint" style="margin-top:.5rem;"></p>
       <div class="row" style="margin-top:.75rem; align-items:flex-start;">
         <div style="flex:1;min-width:200px;">
           <label for="hw-inv-file">Excel file</label>
@@ -540,10 +541,10 @@
       <p id="hw-inv-ok" class="hint hidden" style="margin-top:.75rem;color:#166534;font-weight:600;"></p>
     </div>
     <div class="card">
-      <strong>Inventory by state</strong>
+      <strong>PM inventory by state</strong>
       <p class="hint" style="margin-top:.35rem;">
-        PM line items for sessions whose site is in the selected state. Blank or missing site state is counted as
-        <strong>TN</strong> (same convention as in the app).
+        PM checklist line items (<code>pm_items</code>) for sessions whose site is in the selected state — not the enterprise hardware spreadsheet above.
+        Blank or missing site state is counted as <strong>TN</strong> (same convention as in the app).
       </p>
       <div class="row" style="margin-top:.75rem;">
         <div>
@@ -747,6 +748,7 @@
         .catch(function (e) {
           show($('inv-err'), (e && e.message) || String(e));
         });
+      refreshHardwareInventorySummary().catch(function () {});
     }
     if (v === 'sites') {
       ensureSitesStateSelect()
@@ -966,7 +968,35 @@
       '<div>Users: <strong>' + (s.users ?? '—') + '</strong></div>' +
       '<div>Sites: <span>' + (s.sites ?? '—') + '</span></div>' +
       '<div>Sessions: <span>' + (s.pm_sessions ?? '—') + '</span></div>' +
-      '<div>PM items: <span>' + (s.pm_items ?? '—') + '</span></div>';
+      '<div>PM items: <span>' + (s.pm_items ?? '—') + '</span></div>' +
+      '<div>Hardware register rows: <span>' + (s.hardware_inventory ?? '—') + '</span></div>';
+  }
+
+  async function refreshHardwareInventorySummary() {
+    var el = $('hw-inv-summary');
+    if (!el) return;
+    try {
+      const data = await api('/auth/admin/hardware-inventory-summary', { method: 'GET' });
+      var parts = [
+        'Enterprise hardware register: <strong>' + (data.total != null ? data.total : '—') + '</strong> row(s) in the database.',
+      ];
+      if (data.batches && data.batches.length) {
+        parts.push(
+          ' Recent batches: ' +
+            data.batches
+              .slice(0, 12)
+              .map(function (b) {
+                return '<code>' + escapeHtml(String(b.batch)) + '</code> (' + b.count + ')';
+              })
+              .join(', ') +
+            (data.batches.length > 12 ? ' …' : '') +
+            '.'
+        );
+      }
+      el.innerHTML = parts.join('');
+    } catch (e) {
+      el.textContent = 'Could not load hardware summary: ' + ((e && e.message) || String(e));
+    }
   }
 
   let cachedStateRows = [];
@@ -1393,6 +1423,7 @@
           alert(msg);
         }
         await refreshStats();
+        await refreshHardwareInventorySummary();
       } catch (e) {
         show(errEl, (e && e.message) || String(e));
       } finally {

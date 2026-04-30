@@ -802,7 +802,13 @@ app.delete('/auth/users/:id', authRequired, adminRequired, async (req, res) => {
 });
 
 async function adminCountTable(tableKey) {
-  const allowed = { users: 'users', sites: 'sites', pm_sessions: 'pm_sessions', pm_items: 'pm_items' };
+  const allowed = {
+    users: 'users',
+    sites: 'sites',
+    pm_sessions: 'pm_sessions',
+    pm_items: 'pm_items',
+    hardware_inventory_rows: 'hardware_inventory_rows',
+  };
   const table = allowed[tableKey];
   if (!table) return null;
   try {
@@ -815,16 +821,34 @@ async function adminCountTable(tableKey) {
 
 app.get('/auth/admin/stats', authRequired, adminRequired, async (req, res) => {
   try {
-    const [users, sites, pm_sessions, pm_items] = await Promise.all([
+    const [users, sites, pm_sessions, pm_items, hardware_inventory] = await Promise.all([
       adminCountTable('users'),
       adminCountTable('sites'),
       adminCountTable('pm_sessions'),
       adminCountTable('pm_items'),
+      adminCountTable('hardware_inventory_rows'),
     ]);
-    return res.json({ users, sites, pm_sessions, pm_items });
+    return res.json({ users, sites, pm_sessions, pm_items, hardware_inventory });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to load stats' });
+  }
+});
+
+app.get('/auth/admin/hardware-inventory-summary', authRequired, adminRequired, async (req, res) => {
+  try {
+    const total = await pool.query(`SELECT COUNT(*)::int AS c FROM hardware_inventory_rows`);
+    const batches = await pool.query(
+      `SELECT import_batch AS batch, COUNT(*)::int AS count
+       FROM hardware_inventory_rows
+       GROUP BY import_batch
+       ORDER BY MAX(created_at) DESC
+       LIMIT 50`
+    );
+    return res.json({ total: total.rows[0].c, batches: batches.rows });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load hardware inventory summary' });
   }
 });
 
@@ -980,6 +1004,10 @@ app.post(
         replace,
         matchSites,
       });
+
+      console.log(
+        `[hardware-inventory-import] inserted=${result.inserted} batch=${batch} sheet=${sheetName} file=${sourceFile}`
+      );
 
       return res.json({
         ok: true,
