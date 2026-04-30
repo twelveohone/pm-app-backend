@@ -1356,6 +1356,7 @@
       if (summary) summary.textContent = '';
       if (regionSel) {
         regionSel.innerHTML = '<option value="">All regions</option>';
+        regionSel.disabled = true;
       }
       return;
     }
@@ -1388,6 +1389,7 @@
           o.textContent = options[oi];
           regionSel.appendChild(o);
         }
+        regionSel.disabled = options.length === 0;
         if (keep && options.some(function (x) { return x.toLowerCase() === keep.toLowerCase(); })) {
           var matched = options.find(function (x) { return x.toLowerCase() === keep.toLowerCase(); });
           regionSel.value = matched || '';
