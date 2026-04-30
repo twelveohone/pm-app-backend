@@ -741,7 +741,7 @@
           <button type="button" class="secondary" id="btn-inv-load">Load</button>
         </div>
         <div style="align-self:flex-end;">
-          <button type="button" class="secondary" id="btn-inv-csv">Download CSV</button>
+          <button type="button" class="secondary" id="btn-inv-export">Export</button>
         </div>
       </div>
       <div id="inv-err" class="err hidden"></div>
@@ -1608,15 +1608,18 @@
       });
   }
 
-  async function downloadInventoryCombinedCsv() {
+  async function downloadInventoryCombinedExport(format) {
     var sel = $('inv-state-select');
     var code = sel && sel.value ? String(sel.value).trim() : '';
     if (!code) {
       alert('Choose a state first.');
       return;
     }
+    var fmt = String(format || 'csv').toLowerCase();
+    if (fmt !== 'csv' && fmt !== 'xlsx') fmt = 'csv';
     try {
-      var res = await fetch('/auth/inventory-combined-export?' + inventoryCombinedQueryString(), {
+      var qs = inventoryCombinedQueryString() + '&format=' + encodeURIComponent(fmt);
+      var res = await fetch('/auth/inventory-combined-export?' + qs, {
         headers: { Authorization: 'Bearer ' + token() },
       });
       if (res.status === 401) {
@@ -1634,7 +1637,7 @@
       a.href = URL.createObjectURL(blob);
       var cd = res.headers.get('Content-Disposition');
       var fnMatch = cd && cd.match(/filename="([^"]+)"/i);
-      var fallback = 'inventory-combined-' + code + '.csv';
+      var fallback = 'inventory-combined-' + code + '.' + fmt;
       a.download = fnMatch ? fnMatch[1] : fallback;
       a.click();
       URL.revokeObjectURL(a.href);
@@ -2146,10 +2149,15 @@
       refreshUnifiedInventory();
     });
   }
-  var btnInvCsv = $('btn-inv-csv');
-  if (btnInvCsv) {
-    btnInvCsv.addEventListener('click', function () {
-      downloadInventoryCombinedCsv();
+  var btnInvExport = $('btn-inv-export');
+  if (btnInvExport) {
+    btnInvExport.addEventListener('click', function () {
+      var choice = window.prompt('Export format? Enter CSV or XLSX', 'CSV');
+      if (choice == null) return;
+      var fmt = String(choice || '').trim().toLowerCase();
+      if (fmt === 'xlsx' || fmt === 'xls') return downloadInventoryCombinedExport('xlsx');
+      if (fmt === 'csv' || !fmt) return downloadInventoryCombinedExport('csv');
+      alert('Please enter CSV or XLSX.');
     });
   }
   var invTextFilter = $('inv-text-filter');

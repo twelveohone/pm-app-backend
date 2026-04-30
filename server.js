@@ -3,6 +3,7 @@ const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const XLSX = require('xlsx');
 require('dotenv').config();
 
 const app = express();
@@ -1368,6 +1369,7 @@ app.get('/auth/inventory-combined', authRequired, async (req, res) => {
 app.get('/auth/inventory-combined-export', authRequired, async (req, res) => {
   try {
     const { state, q, rows } = await queryInventoryCombined(pool, req.query.state, req.query.q);
+    const fmt = String(req.query.format || 'csv').toLowerCase() === 'xlsx' ? 'xlsx' : 'csv';
     const headers = [
       'source',
       'detail',
@@ -1401,8 +1403,6 @@ app.get('/auth/inventory-combined-export', authRequired, async (req, res) => {
       };
       lines.push(headers.map((h) => csvEscapeCell(lineObj[h])).join(','));
     }
-    const body = lines.join('\r\n');
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     const qSlug =
       q && String(q).trim()
         ? '-' +
@@ -1412,8 +1412,43 @@ app.get('/auth/inventory-combined-export', authRequired, async (req, res) => {
             .replace(/^_|_$/g, '')
             .slice(0, 48)
         : '';
+    if (fmt === 'xlsx') {
+      const tableRows = rows.map((row) => {
+        const siteOrLoc = row.source === 'pm' ? row.site_name : row.location;
+        const detail = row.source === 'pm' ? row.device_type : row.model;
+        const serial = row.source === 'pm' ? row.serial : row.serial_number;
+        const meta =
+          row.source === 'pm'
+            ? `tech:${row.technician_name || ''}; notes:${row.notes || ''}; damaged:${row.damaged}`
+            : `category:${row.model_category || ''}; batch:${row.import_batch || ''}; file_state:${row.state_name || ''}`;
+        const rid = row.source === 'pm' ? row.item_id : row.id;
+        const st = row.source === 'pm' ? row.state : row.state_code;
+        return {
+          source: row.source,
+          detail,
+          asset_tag: row.asset_tag,
+          serial,
+          state: st,
+          site_or_location: siteOrLoc,
+          meta,
+          row_id: rid,
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(tableRows, { header: headers });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'inventory');
+      const xbuf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      res.setHeader('Content-Disposition', `attachment; filename="inventory-combined-${state}${qSlug}.xlsx"`);
+      return res.send(xbuf);
+    }
+    const body = lines.join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="inventory-combined-${state}${qSlug}.csv"`);
-    res.send(body);
+    return res.send(body);
   } catch (err) {
     if (err.code === 'INVALID_STATE') {
       return res.status(400).json({ error: 'state query param is required (2–10 letter or digit code)' });
