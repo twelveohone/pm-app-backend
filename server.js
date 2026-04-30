@@ -1,9 +1,29 @@
 const path = require('path');
 const express = require('express');
+const multer = require('multer');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+
+const {
+  parseXlsxBuffer,
+  importRecords: importHardwareInventoryRows,
+} = require('./lib/hardwareInventoryImport');
+
+const hardwareInventoryUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 45 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const name = (file.originalname || '').toLowerCase();
+    if (name.endsWith('.xlsx')) return cb(null, true);
+    const okMime =
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      file.mimetype === 'application/octet-stream';
+    if (okMime) return cb(null, true);
+    cb(new Error('Upload an Excel .xlsx file'));
+  },
+});
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -918,6 +938,64 @@ app.get('/auth/admin/inventory-export', authRequired, adminRequired, async (req,
     return res.status(500).json({ error: 'Failed to export inventory' });
   }
 });
+
+app.post(
+  '/auth/admin/hardware-inventory-import',
+  authRequired,
+  adminRequired,
+  (req, res, next) => {
+    hardwareInventoryUpload.single('file')(req, res, (err) => {
+      if (err) return res.status(400).json({ error: err.message || 'Upload failed' });
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ error: 'Missing file (form field name: file)' });
+      }
+      const batch =
+        String(req.body.batch || '').trim() ||
+        `import-${new Date().toISOString().slice(0, 10)}`;
+      const replace =
+        req.body.replace === true ||
+        req.body.replace === 'true' ||
+        req.body.replace === 'on' ||
+        req.body.replace === '1';
+      const matchSites =
+        req.body.matchSites !== false &&
+        req.body.matchSites !== 'false' &&
+        req.body.matchSites !== '0';
+
+      const { sheetName, records, originalName } = parseXlsxBuffer(
+        req.file.buffer,
+        req.file.originalname || 'upload.xlsx'
+      );
+      const sourceFile = path.basename(originalName || req.file.originalname || 'upload.xlsx');
+
+      const result = await importHardwareInventoryRows(pool, {
+        records,
+        batch,
+        sourceFile,
+        replace,
+        matchSites,
+      });
+
+      return res.json({
+        ok: true,
+        sheetName,
+        batch,
+        rowCount: records.length,
+        inserted: result.inserted,
+        deletedPreviousBatchRows: result.deleted,
+        matchedSites: result.matchedSites,
+      });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: err.message || 'Import failed' });
+    }
+  }
+);
 
 app.get('/state-configs', async (req, res) => {
   try {

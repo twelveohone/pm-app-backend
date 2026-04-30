@@ -507,6 +507,39 @@
 
     <div id="admin-view-inventory" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-inventory">
     <div class="card">
+      <strong>Hardware inventory (.xlsx)</strong>
+      <p class="hint" style="margin-top:.35rem;">
+        Upload the enterprise hardware register (Asset Tag, Model, Location, …). Inserts into <code>hardware_inventory_rows</code> on
+        <strong>this server&apos;s database</strong> (e.g. Render). Use this instead of a local CLI import when you don&apos;t have
+        <code>DATABASE_URL</code> on your PC.
+      </p>
+      <div class="row" style="margin-top:.75rem; align-items:flex-start;">
+        <div style="flex:1;min-width:200px;">
+          <label for="hw-inv-file">Excel file</label>
+          <input id="hw-inv-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+        </div>
+        <div>
+          <label for="hw-inv-batch">Batch id (optional)</label>
+          <input id="hw-inv-batch" type="text" placeholder="tn-hardware-2026-04-29" style="max-width:260px;" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:.5rem;">
+        <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:normal;font-size:.88rem;">
+          <input type="checkbox" id="hw-inv-replace" />
+          Replace existing rows for this batch id first
+        </label>
+      </div>
+      <div class="row" style="margin-top:.25rem;">
+        <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:normal;font-size:.88rem;">
+          <input type="checkbox" id="hw-inv-match-sites" checked />
+          Match <code>site_id</code> when Location equals site station or site name
+        </label>
+      </div>
+      <button type="button" id="btn-hw-inv-import">Import to database</button>
+      <div id="hw-inv-err" class="err hidden"></div>
+      <p id="hw-inv-ok" class="hint hidden" style="margin-top:.75rem;color:#166534;font-weight:600;"></p>
+    </div>
+    <div class="card">
       <strong>Inventory by state</strong>
       <p class="hint" style="margin-top:.35rem;">
         PM line items for sessions whose site is in the selected state. Blank or missing site state is counted as
@@ -1308,6 +1341,62 @@
         URL.revokeObjectURL(a.href);
       } catch (e) {
         alert((e && e.message) || String(e));
+      }
+    });
+  }
+
+  var hwImp = $('btn-hw-inv-import');
+  if (hwImp) {
+    hwImp.addEventListener('click', async function () {
+      var fileIn = $('hw-inv-file');
+      var file = fileIn && fileIn.files && fileIn.files[0];
+      var errEl = $('hw-inv-err');
+      var okEl = $('hw-inv-ok');
+      show(errEl, '');
+      if (okEl) {
+        okEl.textContent = '';
+        okEl.classList.add('hidden');
+      }
+      if (!file) {
+        show(errEl, 'Choose an .xlsx file.');
+        return;
+      }
+      var fd = new FormData();
+      fd.append('file', file);
+      fd.append('batch', $('hw-inv-batch') && $('hw-inv-batch').value ? String($('hw-inv-batch').value).trim() : '');
+      fd.append('replace', $('hw-inv-replace') && $('hw-inv-replace').checked ? 'true' : 'false');
+      fd.append('matchSites', $('hw-inv-match-sites') && $('hw-inv-match-sites').checked ? 'true' : 'false');
+      hwImp.disabled = true;
+      try {
+        var res = await fetch('/auth/admin/hardware-inventory-import', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token() },
+          body: fd,
+        });
+        var data = await res.json().catch(function () {
+          return {};
+        });
+        if (!res.ok) throw new Error(data.error || res.statusText || 'Import failed');
+        var msg =
+          'Imported ' +
+          data.inserted +
+          ' row(s). Sheet: ' +
+          data.sheetName +
+          ', batch: ' +
+          data.batch +
+          '.';
+        if (data.matchedSites != null) msg += ' Matched sites: ' + data.matchedSites + '.';
+        if (okEl) {
+          okEl.textContent = msg;
+          okEl.classList.remove('hidden');
+        } else {
+          alert(msg);
+        }
+        await refreshStats();
+      } catch (e) {
+        show(errEl, (e && e.message) || String(e));
+      } finally {
+        hwImp.disabled = false;
       }
     });
   }
