@@ -182,6 +182,12 @@
       justify-content: flex-end;
     }
 
+    .table-sites th:nth-child(3),
+    .table-sites td:nth-child(3) {
+      min-width: 13rem;
+      width: 22%;
+    }
+
     .row {
       display: flex;
       flex-wrap: wrap;
@@ -461,8 +467,16 @@
       gap: 0.65rem;
     }
 
+    /* Station | City: give City more horizontal room */
+    .modal-card .modal-inline2.modal-station-city {
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 2.1fr);
+    }
+
     @media (max-width: 480px) {
       .modal-card .modal-inline2 {
+        grid-template-columns: 1fr;
+      }
+      .modal-card .modal-inline2.modal-station-city {
         grid-template-columns: 1fr;
       }
     }
@@ -575,7 +589,7 @@
               <label for="site-edit-name">Site name</label>
               <input id="site-edit-name" type="text" autocomplete="off" />
             </div>
-            <div class="modal-inline2">
+            <div class="modal-inline2 modal-station-city">
               <div>
                 <label for="site-edit-station">Station</label>
                 <input id="site-edit-station" type="text" autocomplete="off" />
