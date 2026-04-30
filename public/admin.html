@@ -180,6 +180,7 @@
 
     .table-sites td.col-actions .act-btns {
       justify-content: flex-end;
+      flex-wrap: nowrap;
     }
 
     .table-sites th:nth-child(3),
@@ -563,6 +564,9 @@
           <label for="sites-state-select">State</label>
           <select id="sites-state-select" style="min-width:260px;"></select>
         </div>
+        <div style="align-self:flex-end;">
+          <button type="button" class="secondary" id="btn-site-add">Add site</button>
+        </div>
         <div style="margin-left:auto; min-width:240px;">
           <label for="sites-region-select">Region</label>
           <select id="sites-region-select" style="min-width:240px;">
@@ -582,7 +586,7 @@
               <th>State</th>
               <th>WS</th>
               <th>Kiosks</th>
-              <th class="admin-only col-actions">Actions</th>
+              <th class="col-actions">Actions</th>
             </tr>
           </thead>
           <tbody id="sites-body"></tbody>
@@ -1297,6 +1301,8 @@
     $('site-edit-hours').value = str(s.hours);
     $('site-edit-podsys').value = str(s.first_pod_system);
     $('site-edit-kiosksys').value = str(s.first_kiosk_system);
+    var title = $('site-edit-title');
+    if (title) title.textContent = 'Edit site';
     var idLine = $('site-edit-id-line');
     if (idLine) idLine.textContent = 'Site id: ' + (s.id || '');
     show($('site-edit-err'), '');
@@ -1306,6 +1312,40 @@
     try {
       $('site-edit-name').focus();
     } catch (e) {}
+  }
+
+  function openSiteCreateModal() {
+    var generatedId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : 'site-' + Date.now().toString(36);
+    var seedStateSel = $('sites-state-select');
+    var seedRegionSel = $('sites-region-select');
+    siteEditOriginal = {
+      id: generatedId,
+      site_name: '',
+      station: '',
+      city: '',
+      state: seedStateSel && seedStateSel.value ? String(seedStateSel.value).trim().toUpperCase() : '',
+      address: '',
+      zip: '',
+      county: '',
+      region: seedRegionSel && seedRegionSel.value ? String(seedRegionSel.value).trim() : '',
+      primary_phone: '',
+      alt_phones: '',
+      hours: '',
+      workstations: 0,
+      kiosks: 0,
+      first_pod_system: '',
+      first_kiosk_system: '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    openSiteEditModal(siteEditOriginal);
+    var title = $('site-edit-title');
+    if (title) title.textContent = 'Add site';
+    var idLine = $('site-edit-id-line');
+    if (idLine) idLine.textContent = 'New site id: ' + generatedId;
   }
 
   function readSiteEditPayload() {
@@ -1421,12 +1461,11 @@
       for (const s of filtered) {
         var tr = document.createElement('tr');
         var dispState = s.state != null && String(s.state).trim() !== '' ? String(s.state) : 'TN';
-        var actionsCell = isPortalAdmin()
-          ? '<td class="col-actions"><div class="act-btns">' +
-            '<button type="button" class="secondary btn-site-edit">Edit</button>' +
-            '<button type="button" class="danger btn-site-del">Delete</button>' +
-            '</div></td>'
-          : '';
+        var actionsCell =
+          '<td class="col-actions"><div class="act-btns">' +
+          '<button type="button" class="secondary btn-site-edit">Edit</button>' +
+          (isPortalAdmin() ? '<button type="button" class="danger btn-site-del">Delete</button>' : '') +
+          '</div></td>';
         tr.innerHTML =
           '<td>' + escapeHtml(s.site_name || '') + '</td>' +
           '<td>' + escapeHtml(s.station || '') + '</td>' +
@@ -2193,6 +2232,12 @@
   if (sitesSel) {
     sitesSel.addEventListener('change', function () {
       refreshSitesList();
+    });
+  }
+  var btnSiteAdd = $('btn-site-add');
+  if (btnSiteAdd) {
+    btnSiteAdd.addEventListener('click', function () {
+      openSiteCreateModal();
     });
   }
   var sitesRegionSel = $('sites-region-select');
