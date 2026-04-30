@@ -172,7 +172,7 @@
 
     .table-sites th.col-actions,
     .table-sites td.col-actions {
-      width: 5.75rem;
+      width: 11rem;
       text-align: right;
       white-space: nowrap;
       vertical-align: middle;
@@ -415,6 +415,64 @@
     body.portal-staff:not(.portal-admin) .admin-only {
       display: none !important;
     }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.45);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 1.5rem 1rem;
+      overflow-y: auto;
+    }
+
+    .modal-backdrop.hidden {
+      display: none !important;
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-card);
+      padding: 1.25rem 1.35rem;
+      max-width: 520px;
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+
+    .modal-card .modal-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .modal-card .modal-grid input {
+      max-width: none;
+      width: 100%;
+    }
+
+    .modal-card .modal-inline2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+    }
+
+    @media (max-width: 480px) {
+      .modal-card .modal-inline2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .modal-card .modal-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
@@ -480,7 +538,7 @@
       <strong>Sites</strong>
       <p class="hint" style="margin-top:.35rem;">
         Rows from the <code>sites</code> table. Blank or missing state is grouped under <strong>TN</strong> (same convention as the mobile app).
-        <span class="admin-only">Use <strong>Delete</strong> to remove a site from the database (PM sessions and line items for that site are removed). This matches removal from the mobile app.</span>
+        <span class="admin-only"><strong>Edit</strong> updates the server record (mobile app will see changes on the next site sync). <strong>Delete</strong> removes the site and its PM sessions / line items from the database.</span>
       </p>
       <div class="row" style="margin-top:.75rem;">
         <div>
@@ -506,6 +564,92 @@
           </thead>
           <tbody id="sites-body"></tbody>
         </table>
+      </div>
+
+      <div id="site-edit-backdrop" class="modal-backdrop hidden" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="site-edit-title">
+          <strong id="site-edit-title">Edit site</strong>
+          <p class="hint" id="site-edit-id-line" style="margin:.35rem 0 0;font-size:.8rem;"></p>
+          <div class="modal-grid">
+            <div>
+              <label for="site-edit-name">Site name</label>
+              <input id="site-edit-name" type="text" autocomplete="off" />
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="site-edit-station">Station</label>
+                <input id="site-edit-station" type="text" autocomplete="off" />
+              </div>
+              <div>
+                <label for="site-edit-city">City</label>
+                <input id="site-edit-city" type="text" autocomplete="off" />
+              </div>
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="site-edit-state">State</label>
+                <input id="site-edit-state" type="text" autocomplete="off" placeholder="e.g. TN" />
+              </div>
+              <div>
+                <label for="site-edit-zip">Zip</label>
+                <input id="site-edit-zip" type="text" autocomplete="off" />
+              </div>
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="site-edit-ws">Workstations</label>
+                <input id="site-edit-ws" type="number" min="0" step="1" />
+              </div>
+              <div>
+                <label for="site-edit-kiosk">Kiosks</label>
+                <input id="site-edit-kiosk" type="number" min="0" step="1" />
+              </div>
+            </div>
+            <div>
+              <label for="site-edit-address">Address</label>
+              <input id="site-edit-address" type="text" autocomplete="off" />
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="site-edit-county">County</label>
+                <input id="site-edit-county" type="text" autocomplete="off" />
+              </div>
+              <div>
+                <label for="site-edit-region">Region</label>
+                <input id="site-edit-region" type="text" autocomplete="off" />
+              </div>
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="site-edit-phone">Primary phone</label>
+                <input id="site-edit-phone" type="text" autocomplete="off" />
+              </div>
+              <div>
+                <label for="site-edit-altphones">Alt phones</label>
+                <input id="site-edit-altphones" type="text" autocomplete="off" />
+              </div>
+            </div>
+            <div>
+              <label for="site-edit-hours">Hours</label>
+              <input id="site-edit-hours" type="text" autocomplete="off" />
+            </div>
+            <div class="modal-inline2">
+              <div>
+                <label for="site-edit-podsys">First pod system</label>
+                <input id="site-edit-podsys" type="text" autocomplete="off" />
+              </div>
+              <div>
+                <label for="site-edit-kiosksys">First kiosk system</label>
+                <input id="site-edit-kiosksys" type="text" autocomplete="off" />
+              </div>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="site-edit-save">Save</button>
+            <button type="button" class="secondary" id="site-edit-cancel">Cancel</button>
+          </div>
+          <div id="site-edit-err" class="err hidden"></div>
+        </div>
       </div>
     </div>
     </div>
@@ -993,6 +1137,83 @@
     }
   }
 
+  var siteEditOriginal = null;
+
+  function closeSiteEditModal() {
+    var bd = $('site-edit-backdrop');
+    if (bd) {
+      bd.classList.add('hidden');
+      bd.setAttribute('aria-hidden', 'true');
+    }
+    siteEditOriginal = null;
+    show($('site-edit-err'), '');
+  }
+
+  function openSiteEditModal(s) {
+    siteEditOriginal = s;
+    var str = function (v) {
+      return v != null && v !== '' ? String(v) : '';
+    };
+    $('site-edit-name').value = str(s.site_name);
+    $('site-edit-station').value = str(s.station);
+    $('site-edit-city').value = str(s.city);
+    $('site-edit-state').value = str(s.state);
+    $('site-edit-ws').value = String(s.workstations != null ? s.workstations : 0);
+    $('site-edit-kiosk').value = String(s.kiosks != null ? s.kiosks : 0);
+    $('site-edit-address').value = str(s.address);
+    $('site-edit-zip').value = str(s.zip);
+    $('site-edit-county').value = str(s.county);
+    $('site-edit-region').value = str(s.region);
+    $('site-edit-phone').value = str(s.primary_phone);
+    $('site-edit-altphones').value = str(s.alt_phones);
+    $('site-edit-hours').value = str(s.hours);
+    $('site-edit-podsys').value = str(s.first_pod_system);
+    $('site-edit-kiosksys').value = str(s.first_kiosk_system);
+    var idLine = $('site-edit-id-line');
+    if (idLine) idLine.textContent = 'Site id: ' + (s.id || '');
+    show($('site-edit-err'), '');
+    var bd = $('site-edit-backdrop');
+    bd.classList.remove('hidden');
+    bd.setAttribute('aria-hidden', 'false');
+    try {
+      $('site-edit-name').focus();
+    } catch (e) {}
+  }
+
+  function readSiteEditPayload() {
+    if (!siteEditOriginal) throw new Error('No site loaded');
+    var name = $('site-edit-name').value.trim();
+    if (!name) throw new Error('Site name is required');
+    var ws = parseInt($('site-edit-ws').value, 10);
+    var ks = parseInt($('site-edit-kiosk').value, 10);
+    var orig = siteEditOriginal;
+    var tv = function (id) {
+      var el = $(id);
+      var v = el && el.value != null ? el.value.trim() : '';
+      return v !== '' ? v : null;
+    };
+    return {
+      id: orig.id,
+      site_name: name,
+      station: tv('site-edit-station'),
+      city: tv('site-edit-city'),
+      state: tv('site-edit-state'),
+      address: tv('site-edit-address'),
+      zip: tv('site-edit-zip'),
+      county: tv('site-edit-county'),
+      region: tv('site-edit-region'),
+      primary_phone: tv('site-edit-phone'),
+      alt_phones: tv('site-edit-altphones'),
+      hours: tv('site-edit-hours'),
+      workstations: Number.isFinite(ws) && ws >= 0 ? ws : 0,
+      kiosks: Number.isFinite(ks) && ks >= 0 ? ks : 0,
+      first_pod_system: tv('site-edit-podsys'),
+      first_kiosk_system: tv('site-edit-kiosksys'),
+      created_at: orig.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
   async function refreshSitesList() {
     var sel = $('sites-state-select');
     var body = $('sites-body');
@@ -1027,7 +1248,10 @@
         var tr = document.createElement('tr');
         var dispState = s.state != null && String(s.state).trim() !== '' ? String(s.state) : 'TN';
         var actionsCell = isPortalAdmin()
-          ? '<td class="col-actions"><div class="act-btns"><button type="button" class="danger btn-site-del">Delete</button></div></td>'
+          ? '<td class="col-actions"><div class="act-btns">' +
+            '<button type="button" class="secondary btn-site-edit">Edit</button>' +
+            '<button type="button" class="danger btn-site-del">Delete</button>' +
+            '</div></td>'
           : '';
         tr.innerHTML =
           '<td>' + escapeHtml(s.site_name || '') + '</td>' +
@@ -1038,6 +1262,12 @@
           '<td>' + escapeHtml(String(s.kiosks != null ? s.kiosks : '')) + '</td>' +
           '<td><code style="font-size:.72rem">' + escapeHtml(String(s.id || '')) + '</code></td>' +
           actionsCell;
+        var editBtn = tr.querySelector('.btn-site-edit');
+        if (editBtn) {
+          editBtn.addEventListener('click', function () {
+            openSiteEditModal(s);
+          });
+        }
         var delBtn = tr.querySelector('.btn-site-del');
         if (delBtn) {
           delBtn.addEventListener('click', function () {
@@ -1581,6 +1811,38 @@
       refreshSitesList();
     });
   }
+
+  var siteEditBd = $('site-edit-backdrop');
+  if (siteEditBd) {
+    siteEditBd.addEventListener('click', function (ev) {
+      if (ev.target === siteEditBd) closeSiteEditModal();
+    });
+  }
+  var siteEditCancel = $('site-edit-cancel');
+  if (siteEditCancel) siteEditCancel.addEventListener('click', closeSiteEditModal);
+  var siteEditSave = $('site-edit-save');
+  if (siteEditSave) {
+    siteEditSave.addEventListener('click', async function () {
+      show($('site-edit-err'), '');
+      try {
+        var payload = readSiteEditPayload();
+        await api('/sites/' + encodeURIComponent(payload.id), {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+        closeSiteEditModal();
+        await refreshSitesList();
+        await refreshStats();
+      } catch (e) {
+        show($('site-edit-err'), e.message);
+      }
+    });
+  }
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var bd = $('site-edit-backdrop');
+    if (bd && !bd.classList.contains('hidden')) closeSiteEditModal();
+  });
   var hwRegSel = $('hw-reg-state-select');
   if (hwRegSel) {
     hwRegSel.addEventListener('change', function () {
