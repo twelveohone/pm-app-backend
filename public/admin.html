@@ -756,7 +756,7 @@
               <th>Item</th>
               <th>Serial</th>
               <th>Asset tag</th>
-              <th>Details</th>
+              <th>Notes</th>
               <th class="admin-only">Actions</th>
             </tr>
           </thead>
@@ -1514,22 +1514,17 @@
         var st = r.source === 'pm' ? r.state : r.state_code;
         var item = r.source === 'pm' ? r.device_type : r.model;
         var ser = r.source === 'pm' ? r.serial : r.serial_number;
-        var details =
-          r.source === 'pm'
-            ? escapeHtml(String(r.technician_name || '')) +
-              (r.notes ? ' · ' + escapeHtml(String(r.notes)) : '') +
-              ' · damaged ' +
-              (r.damaged ? '1' : '0')
-            : escapeHtml(String(r.model_category || '')) +
-              (r.import_batch ? ' · batch ' + escapeHtml(String(r.import_batch)) : '') +
-              (r.state_name ? ' · file state ' + escapeHtml(String(r.state_name)) : '');
+        var hasDamage = r.source === 'pm' ? !!r.damaged : !!r.pm_damaged;
+        var rawNotes = r.source === 'pm' ? String(r.notes || '') : String(r.pm_notes || '');
+        var hasNotes = rawNotes.trim().length > 0;
+        var notes = hasDamage || hasNotes ? escapeHtml(rawNotes) : '';
         tr.innerHTML =
           '<td>' + escapeHtml(String(where || '')) + '</td>' +
           '<td><code>' + escapeHtml(String(st || '')) + '</code></td>' +
           '<td><code>' + escapeHtml(String(item || '')) + '</code></td>' +
           '<td>' + escapeHtml(String(ser || '')) + '</td>' +
           '<td>' + escapeHtml(String(r.asset_tag || '')) + '</td>' +
-          '<td style="font-size:.82rem;">' + details + '</td>' +
+          '<td style="font-size:.82rem;">' + notes + '</td>' +
           adminTd;
         if (isPortalAdmin()) {
           if (r.source === 'pm') {
