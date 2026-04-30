@@ -157,10 +157,23 @@
       gap: 0.35rem;
     }
 
+    /* Fixed layout + widths so the table spans the card; Delete sits on the right edge. */
+    .table-sites {
+      table-layout: fixed;
+      width: 100%;
+    }
+
+    .table-sites th:first-child,
+    .table-sites td:first-child {
+      width: 34%;
+      word-wrap: break-word;
+      text-align: left;
+    }
+
     .table-sites th.col-actions,
     .table-sites td.col-actions {
+      width: 5.75rem;
       text-align: right;
-      width: 1%;
       white-space: nowrap;
       vertical-align: middle;
     }
