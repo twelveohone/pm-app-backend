@@ -571,7 +571,6 @@
               <th>State</th>
               <th>WS</th>
               <th>Kiosks</th>
-              <th>Site id</th>
               <th class="admin-only col-actions">Actions</th>
             </tr>
           </thead>
@@ -1273,7 +1272,6 @@
           '<td><code>' + escapeHtml(dispState) + '</code></td>' +
           '<td>' + escapeHtml(String(s.workstations != null ? s.workstations : '')) + '</td>' +
           '<td>' + escapeHtml(String(s.kiosks != null ? s.kiosks : '')) + '</td>' +
-          '<td><code style="font-size:.72rem">' + escapeHtml(String(s.id || '')) + '</code></td>' +
           actionsCell;
         var editBtn = tr.querySelector('.btn-site-edit');
         if (editBtn) {
