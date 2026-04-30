@@ -193,6 +193,102 @@ async function ensurePmStateConfigs() {
   console.log('Seeded pm_state_configs (TN, MA)');
 }
 
+async function ensureHardwareInventoryTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS hardware_inventory_rows (
+      id TEXT PRIMARY KEY,
+      import_batch TEXT NOT NULL,
+      source_file TEXT,
+      model_category TEXT,
+      model TEXT,
+      account TEXT,
+      asset_tag TEXT,
+      serial_number TEXT,
+      state_name TEXT,
+      location TEXT,
+      stockroom TEXT,
+      company TEXT,
+      installed TEXT,
+      purchase_order TEXT,
+      warranty_expiration TEXT,
+      owned TEXT,
+      contract TEXT,
+      sold_product TEXT,
+      site_id TEXT REFERENCES sites(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    ALTER TABLE hardware_inventory_rows
+      ADD COLUMN IF NOT EXISTS pm_cleaned SMALLINT,
+      ADD COLUMN IF NOT EXISTS pm_damaged SMALLINT,
+      ADD COLUMN IF NOT EXISTS pm_notes TEXT,
+      ADD COLUMN IF NOT EXISTS last_pm_sync_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS pm_session_id TEXT
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_hardware_inventory_batch ON hardware_inventory_rows (import_batch)`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_hardware_inventory_location ON hardware_inventory_rows (location)`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_hardware_inventory_serial ON hardware_inventory_rows (serial_number)`
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_hardware_inventory_asset_tag ON hardware_inventory_rows (asset_tag)`
+  );
+}
+
+/**
+ * Push PM item fields into enterprise hardware_inventory_rows when serial or asset tag matches.
+ * Matches against either serial_number or asset_tag on the inventory row (handles legacy mix-ups).
+ * @param {import('pg').Pool | import('pg').PoolClient} q
+ */
+async function syncHardwareInventoryFromPmItem(q, item, sessionId) {
+  const serial =
+    item.serial != null && String(item.serial).trim() !== '' ? String(item.serial).trim() : null;
+  const assetTag =
+    item.asset_tag != null && String(item.asset_tag).trim() !== ''
+      ? String(item.asset_tag).trim()
+      : null;
+  if (!serial && !assetTag) return;
+
+  const cleaned = Number(item.cleaned) ? 1 : 0;
+  const damaged = Number(item.damaged) ? 1 : 0;
+  const notes = item.notes != null ? String(item.notes) : null;
+  const sid = sessionId != null ? String(sessionId) : item.session_id != null ? String(item.session_id) : null;
+
+  await q.query(
+    `UPDATE hardware_inventory_rows
+     SET serial_number = CASE
+           WHEN $1::text IS NOT NULL AND BTRIM($1::text) <> '' THEN BTRIM($1::text)
+           ELSE serial_number
+         END,
+         asset_tag = CASE
+           WHEN $2::text IS NOT NULL AND BTRIM($2::text) <> '' THEN BTRIM($2::text)
+           ELSE asset_tag
+         END,
+         pm_cleaned = $3::smallint,
+         pm_damaged = $4::smallint,
+         pm_notes = $5,
+         last_pm_sync_at = NOW(),
+         pm_session_id = $6
+     WHERE (
+       ($1::text IS NOT NULL AND BTRIM($1::text) <> '' AND (
+         LOWER(BTRIM(COALESCE(serial_number, ''))) = LOWER(BTRIM($1::text))
+         OR LOWER(BTRIM(COALESCE(asset_tag, ''))) = LOWER(BTRIM($1::text))
+       ))
+       OR
+       ($2::text IS NOT NULL AND BTRIM($2::text) <> '' AND (
+         LOWER(BTRIM(COALESCE(serial_number, ''))) = LOWER(BTRIM($2::text))
+         OR LOWER(BTRIM(COALESCE(asset_tag, ''))) = LOWER(BTRIM($2::text))
+       ))
+     )`,
+    [serial, assetTag, cleaned, damaged, notes, sid]
+  );
+}
+
 async function ensureSitesTable() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS sites (
@@ -670,6 +766,117 @@ app.get('/auth/admin/stats', authRequired, adminRequired, async (req, res) => {
   }
 });
 
+const ADMIN_INVENTORY_ORDER_BY = `ORDER BY ps.started_at DESC NULLS LAST,
+  COALESCE(s.site_name, '') ASC,
+  CASE pi.unit_type WHEN 'pod' THEN 1 WHEN 'kiosk' THEN 2 ELSE 3 END,
+  pi.unit_index ASC,
+  CASE pi.device_type
+    WHEN 'camera_tower' THEN 1
+    WHEN 'signature_pad' THEN 2
+    WHEN 'printer' THEN 3
+    WHEN 'scanner' THEN 4
+    WHEN 'ups' THEN 5
+    WHEN 'handheld_scanner' THEN 6
+    WHEN 'testing_station' THEN 7
+    ELSE 99
+  END, pi.device_type`;
+
+async function queryAdminInventory(poolConn, stateCodeRaw) {
+  const stateCode = String(stateCodeRaw || '')
+    .trim()
+    .toUpperCase();
+  if (!stateCode || !/^[A-Z0-9]{2,10}$/.test(stateCode)) {
+    const err = new Error('INVALID_STATE');
+    err.code = 'INVALID_STATE';
+    throw err;
+  }
+  const result = await poolConn.query(
+    `SELECT
+      pi.id AS item_id,
+      pi.session_id,
+      pi.unit_type,
+      pi.unit_index,
+      pi.device_type,
+      pi.cleaned,
+      pi.damaged,
+      pi.notes,
+      pi.serial,
+      pi.asset_tag,
+      pi.printer_master_pod,
+      pi.updated_at AS item_updated_at,
+      ps.technician_name,
+      ps.started_at AS session_started_at,
+      COALESCE(s.site_name, '(unknown site)') AS site_name,
+      COALESCE(NULLIF(TRIM(s.state), ''), 'TN') AS resolved_site_state
+    FROM pm_items pi
+    INNER JOIN pm_sessions ps ON pi.session_id = ps.id
+    LEFT JOIN sites s ON ps.site_id = s.id
+    WHERE UPPER(COALESCE(NULLIF(TRIM(s.state), ''), 'TN')) = $1
+    ${ADMIN_INVENTORY_ORDER_BY}
+    LIMIT 100000`,
+    [stateCode]
+  );
+  return { state: stateCode, rows: result.rows };
+}
+
+function csvEscapeCell(val) {
+  if (val == null) return '';
+  const s = String(val);
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+app.get('/auth/admin/inventory', authRequired, adminRequired, async (req, res) => {
+  try {
+    const { state, rows } = await queryAdminInventory(pool, req.query.state);
+    return res.json({ state, count: rows.length, rows });
+  } catch (err) {
+    if (err.code === 'INVALID_STATE') {
+      return res.status(400).json({ error: 'state query param is required (2–10 letter or digit code)' });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load inventory' });
+  }
+});
+
+app.get('/auth/admin/inventory-export', authRequired, adminRequired, async (req, res) => {
+  try {
+    const { state, rows } = await queryAdminInventory(pool, req.query.state);
+    const headers = [
+      'site_name',
+      'resolved_site_state',
+      'session_id',
+      'session_started_at',
+      'technician_name',
+      'unit_type',
+      'unit_index',
+      'device_type',
+      'cleaned',
+      'damaged',
+      'serial',
+      'asset_tag',
+      'printer_master_pod',
+      'notes',
+      'item_updated_at',
+      'item_id',
+    ];
+    const lines = [headers.join(',')];
+    for (const row of rows) {
+      lines.push(headers.map((h) => csvEscapeCell(row[h])).join(','));
+    }
+    const body = lines.join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="inventory-${state}.csv"`);
+    res.send(body);
+  } catch (err) {
+    if (err.code === 'INVALID_STATE') {
+      return res.status(400).json({ error: 'state query param is required (2–10 letter or digit code)' });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to export inventory' });
+  }
+});
+
 app.get('/state-configs', async (req, res) => {
   try {
     const result = await pool.query(
@@ -962,6 +1169,10 @@ app.post('/import-session', authRequired, async (req, res) => {
       );
     }
 
+    for (const item of items) {
+      await syncHardwareInventoryFromPmItem(client, item, session.id);
+    }
+
     await client.query('COMMIT');
 
     res.json({
@@ -1005,7 +1216,7 @@ app.post('/update-item', authRequired, async (req, res) => {
            printer_master_pod = COALESCE($6, printer_master_pod),
            updated_at = COALESCE($7, updated_at)
        WHERE id = $8
-       RETURNING id, device_type, cleaned, damaged, notes, serial, asset_tag, printer_master_pod, updated_at`,
+       RETURNING id, session_id, device_type, cleaned, damaged, notes, serial, asset_tag, printer_master_pod, updated_at`,
       [
         cleaned === undefined ? null : cleaned,
         damaged === undefined ? null : damaged,
@@ -1018,7 +1229,12 @@ app.post('/update-item', authRequired, async (req, res) => {
       ]
     );
 
-    res.json(result.rows[0] || null);
+    const row = result.rows[0] || null;
+    if (row) {
+      await syncHardwareInventoryFromPmItem(pool, row, row.session_id);
+    }
+
+    res.json(row);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Update failed' });
@@ -1030,6 +1246,7 @@ async function start() {
     await ensureAuthTables();
     await ensurePmStateConfigs();
     await ensureSitesTable();
+    await ensureHardwareInventoryTable();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });

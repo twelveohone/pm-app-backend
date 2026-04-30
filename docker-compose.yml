@@ -1,0 +1,16 @@
+# Local Postgres for PM Tracker backend + Expanded app testing.
+# From this folder: docker compose up -d
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: change_me
+      POSTGRES_DB: inventory_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - pm_app_pgdata:/var/lib/postgresql/data
+
+volumes:
+  pm_app_pgdata:

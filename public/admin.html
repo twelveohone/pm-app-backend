@@ -5,80 +5,389 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PM Admin</title>
   <style>
-    :root { font-family: system-ui, sans-serif; color: #1a1a1a; }
-    body { max-width: 960px; margin: 0 auto; padding: 1rem 1.25rem 3rem; background: #f6f7f9; }
-    h1 { font-size: 1.25rem; margin: 0 0 1rem; }
-    .card { background: #fff; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-    label { display: block; font-size: .8rem; color: #555; margin-bottom: .25rem; }
-    input, select, button { font: inherit; padding: .5rem .6rem; border: 1px solid #ccc; border-radius: 6px; }
-    input { width: 100%; max-width: 280px; box-sizing: border-box; }
-    button { background: #1a5fb4; color: #fff; border: none; cursor: pointer; }
-    button.secondary { background: #555; }
-    button.danger { background: #9a0000; }
-    button:disabled { opacity: .6; cursor: not-allowed; }
-    .act-btns { display: flex; flex-wrap: wrap; gap: .35rem; }
-    .row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; margin-bottom: .75rem; }
-    .err { color: #b00020; font-size: .9rem; margin: .5rem 0; }
-    .stats { display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: .95rem; }
-    .stats span { color: #666; }
-    table { width: 100%; border-collapse: collapse; font-size: .875rem; }
-    th, td { text-align: left; padding: .5rem .4rem; border-bottom: 1px solid #eee; vertical-align: middle; }
-    th { font-size: .75rem; text-transform: uppercase; color: #666; }
-    .hidden { display: none !important; }
-    .toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .5rem; }
-    textarea.wide { width: 100%; max-width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: .8rem; min-height: 72px; padding: .5rem; border: 1px solid #ccc; border-radius: 6px; }
-    .hint { font-size: .78rem; color: #555; margin: .25rem 0 .5rem; line-height: 1.35; }
-    hr.soft { margin: 1rem 0; border: none; border-top: 1px solid #eee; }
+    :root {
+      --bg-top: #e8eef4;
+      --bg-bottom: #f2f5f9;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #1e4a7a;
+      --accent-soft: rgba(30, 74, 122, 0.09);
+      --danger: #b91c1c;
+      --radius: 14px;
+      --radius-sm: 10px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow-card: 0 4px 24px rgba(15, 23, 42, 0.07);
+      --font: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background: linear-gradient(168deg, var(--bg-top) 0%, var(--bg-bottom) 55%, #eef2f7 100%);
+      padding: 1.25rem 1rem 3rem;
+    }
+
+    .wrap {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin: 0;
+      color: var(--text);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.35rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--shadow-card);
+    }
+
+    .card > strong {
+      display: block;
+      font-size: 1.05rem;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 0.35rem;
+    }
+
+    .login-brand {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin-bottom: 0.35rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    input,
+    select,
+    button {
+      font: inherit;
+    }
+
+    input,
+    select {
+      padding: 0.55rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #fafbfc;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+      background: #fff;
+    }
+
+    input {
+      width: 100%;
+      max-width: 280px;
+    }
+
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.55rem 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+    }
+
+    button:hover:not(:disabled) {
+      background: #163a61;
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    button.secondary:hover:not(:disabled) {
+      background: #334155;
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    button.danger:hover:not(:disabled) {
+      background: #991b1b;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .act-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+      align-items: flex-end;
+      margin-bottom: 0.75rem;
+    }
+
+    .err {
+      color: var(--danger);
+      font-size: 0.88rem;
+      margin: 0.5rem 0;
+      font-weight: 500;
+    }
+
+    .stats {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      font-size: 0.95rem;
+      margin-top: 0.5rem;
+    }
+
+    .stats span {
+      color: var(--text-muted);
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+      margin-top: 0.65rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+      background: var(--surface);
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 0.55rem 0.65rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    th {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      color: var(--text-muted);
+      background: #f1f5f9;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .toolbar-text .tagline {
+      margin: 0.35rem 0 0;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      font-weight: 450;
+      max-width: 26rem;
+      line-height: 1.4;
+    }
+
+    textarea.wide {
+      width: 100%;
+      max-width: 100%;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8rem;
+      min-height: 72px;
+      padding: 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #fafbfc;
+    }
+
+    .hint {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin: 0.15rem 0 0.65rem;
+      line-height: 1.45;
+    }
+
+    hr.soft {
+      margin: 1.25rem 0;
+      border: none;
+      border-top: 1px solid var(--border);
+    }
+
     .device-panel {
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      background: #f9fafb;
-      padding: .6rem .75rem;
-      margin: .35rem 0 .75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: linear-gradient(180deg, #fafbfc 0%, #f8fafc 100%);
+      padding: 0.75rem 0.85rem;
+      margin: 0.4rem 0 0.85rem;
       min-height: 2.5rem;
     }
-    .device-panel table { width: 100%; font-size: .82rem; }
-    .device-panel td, .device-panel th { padding: .35rem .25rem; border-bottom: 1px solid #eee; }
-    .device-panel th { color: #666; font-size: .72rem; text-transform: uppercase; }
-    .device-panel .btn-remove { background: transparent; color: #9a0000; border: none; padding: .2rem .4rem; cursor: pointer; font-size: .8rem; }
-    .device-panel .ws-empty { color: #888; font-size: .85rem; margin: 0; font-style: italic; }
-    .ws-add-row { align-items: flex-end; margin-top: .25rem; }
-    .ws-add-row input[type="text"] { min-width: 160px; max-width: 100%; }
+
+    .device-panel table {
+      width: 100%;
+      font-size: 0.82rem;
+    }
+
+    .device-panel td,
+    .device-panel th {
+      padding: 0.4rem 0.35rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .device-panel th {
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .device-panel .btn-remove {
+      background: transparent;
+      color: var(--danger);
+      border: none;
+      padding: 0.2rem 0.4rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .device-panel .ws-empty {
+      color: var(--text-muted);
+      font-size: 0.86rem;
+      margin: 0;
+      font-style: italic;
+    }
+
+    .ws-add-row {
+      align-items: flex-end;
+      margin-top: 0.35rem;
+    }
+
+    .ws-add-row input[type='text'] {
+      min-width: 160px;
+      max-width: 100%;
+    }
+
     .admin-nav {
       display: flex;
       flex-wrap: wrap;
-      gap: .35rem;
-      margin: 0 0 1rem;
-      padding: 0;
+      gap: 0.35rem;
+      margin: 0 0 1.15rem;
+      padding: 0.35rem;
       list-style: none;
-      border-bottom: 1px solid #d8dbe0;
+      background: rgba(255, 255, 255, 0.65);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
     }
+
     .admin-nav-item {
-      background: #e8eaed;
-      color: #333;
-      border: 1px solid transparent;
-      border-bottom: none;
-      border-radius: 8px 8px 0 0;
-      padding: .5rem 1rem;
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.55rem 1rem;
       cursor: pointer;
-      font-size: .92rem;
-      margin-bottom: -1px;
-    }
-    .admin-nav-item:hover { filter: brightness(0.97); }
-    .admin-nav-item.active {
-      background: #fff;
-      border-color: #d8dbe0;
-      border-bottom-color: #fff;
-      color: #1a5fb4;
+      font-size: 0.9rem;
       font-weight: 600;
+      transition: background 0.15s, color 0.15s;
     }
-    .admin-view { margin-bottom: .5rem; }
+
+    .admin-nav-item:hover {
+      background: rgba(30, 74, 122, 0.06);
+      color: var(--text);
+    }
+
+    .admin-nav-item.active {
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: var(--shadow);
+    }
+
+    .admin-view {
+      margin-bottom: 0.5rem;
+    }
+
+    code {
+      font-size: 0.85em;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+      background: #f1f5f9;
+      color: #0f172a;
+    }
+
+    @media (max-width: 560px) {
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
   </style>
 </head>
 <body>
+  <div class="wrap">
   <div id="login-panel" class="card">
+    <div class="login-brand">PM Tracker</div>
     <h1>Admin sign in</h1>
-    <p style="margin:0 0 1rem;color:#555;font-size:.9rem;">Use an account with the <strong>admin</strong> role.</p>
+    <p style="margin:0 0 1rem;color:#64748b;font-size:.9rem;line-height:1.45;">Use an account with the <strong>admin</strong> role.</p>
     <div class="row">
       <div>
         <label for="email">Email</label>
@@ -95,7 +404,10 @@
 
   <div id="app-panel" class="hidden">
     <div class="toolbar">
-      <h1>PM Admin</h1>
+      <div class="toolbar-text">
+        <h1>PM Admin</h1>
+        <p class="tagline">Backend administration — users, state configuration, and inventory exports.</p>
+      </div>
       <button type="button" class="secondary" id="btn-logout">Sign out</button>
     </div>
 
@@ -105,6 +417,9 @@
       </button>
       <button type="button" class="admin-nav-item" data-admin-view="users" role="tab" aria-selected="false" id="tab-users">
         Users
+      </button>
+      <button type="button" class="admin-nav-item" data-admin-view="inventory" role="tab" aria-selected="false" id="tab-inventory">
+        Inventory
       </button>
       <button type="button" class="admin-nav-item" data-admin-view="states" role="tab" aria-selected="false" id="tab-states">
         State &amp; devices
@@ -123,7 +438,7 @@
     <div class="card">
       <strong>Users</strong>
       <div id="users-err" class="err hidden"></div>
-      <div style="overflow-x:auto;margin-top:.75rem;">
+      <div class="table-scroll">
         <table>
           <thead>
             <tr>
@@ -152,16 +467,57 @@
     </div>
     </div>
 
+    <div id="admin-view-inventory" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-inventory">
+    <div class="card">
+      <strong>Inventory by state</strong>
+      <p class="hint" style="margin-top:.35rem;">
+        PM line items for sessions whose site is in the selected state. Blank or missing site state is counted as
+        <strong>TN</strong> (same convention as in the app).
+      </p>
+      <div class="row" style="margin-top:.75rem;">
+        <div>
+          <label for="inv-state-select">State</label>
+          <select id="inv-state-select" style="min-width:240px;"></select>
+        </div>
+        <button type="button" class="secondary" id="btn-inv-export">Export CSV</button>
+      </div>
+      <div id="inv-err" class="err hidden"></div>
+      <p id="inv-summary" class="hint" style="margin:.5rem 0 0;"></p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Site</th>
+              <th>State</th>
+              <th>Session</th>
+              <th>Started</th>
+              <th>Technician</th>
+              <th>Unit type</th>
+              <th>Unit #</th>
+              <th>Device</th>
+              <th>Cleaned</th>
+              <th>Damaged</th>
+              <th>Serial</th>
+              <th>Asset tag</th>
+              <th>Master pod</th>
+              <th>Notes</th>
+              <th>Item updated</th>
+            </tr>
+          </thead>
+          <tbody id="inv-body"></tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+
     <div id="admin-view-states" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-states">
     <div class="card">
-      <strong>State &amp; device configurations</strong>
+      <strong>State configuration</strong>
       <p class="hint">
-        These drive which device types appear for each state (workstation pods vs non-workstation / kiosk units). Allowed
-        keys:
+        Controls which device types appear for each state for workstation pods versus kiosk / non-workstation units.
       </p>
-      <p id="device-types-hint" class="hint" style="font-family:ui-monospace,monospace;"></p>
       <div id="statecfg-list-err" class="err hidden"></div>
-      <div style="overflow-x:auto;margin-top:.5rem;">
+      <div class="table-scroll">
         <table>
           <thead>
             <tr>
@@ -247,6 +603,7 @@
     </div>
     </div>
   </div>
+  </div>
 
   <script>
 (function () {
@@ -287,10 +644,17 @@
   }
 
   function showAdminView(view) {
-    var v = view === 'users' || view === 'states' ? view : 'overview';
+    var v =
+      view === 'users' || view === 'states' || view === 'inventory' ? view : 'overview';
     var showId =
-      v === 'users' ? 'admin-view-users' : v === 'states' ? 'admin-view-states' : 'admin-view-overview';
-    ['admin-view-overview', 'admin-view-users', 'admin-view-states'].forEach(function (id) {
+      v === 'users'
+        ? 'admin-view-users'
+        : v === 'states'
+          ? 'admin-view-states'
+          : v === 'inventory'
+            ? 'admin-view-inventory'
+            : 'admin-view-overview';
+    ['admin-view-overview', 'admin-view-users', 'admin-view-states', 'admin-view-inventory'].forEach(function (id) {
       var el = $(id);
       if (el) el.classList.toggle('hidden', id !== showId);
     });
@@ -302,11 +666,20 @@
     try {
       history.replaceState(null, '', v === 'overview' ? '#overview' : '#' + v);
     } catch (e) {}
+    if (v === 'inventory') {
+      ensureInventoryStates()
+        .then(function () {
+          return refreshInventory();
+        })
+        .catch(function (e) {
+          show($('inv-err'), (e && e.message) || String(e));
+        });
+    }
   }
 
   function initAdminViewFromHash() {
     var raw = (location.hash || '').replace(/^#/, '').toLowerCase();
-    if (raw === 'users' || raw === 'states' || raw === 'overview') showAdminView(raw);
+    if (raw === 'users' || raw === 'states' || raw === 'overview' || raw === 'inventory') showAdminView(raw);
     else showAdminView('overview');
   }
 
@@ -316,6 +689,87 @@
     });
   });
   window.addEventListener('hashchange', initAdminViewFromHash);
+
+  async function ensureInventoryStates() {
+    var sel = $('inv-state-select');
+    if (!sel || sel.options.length > 0) return;
+    const res = await fetch('/state-configs');
+    if (!res.ok) throw new Error('Failed to load state list');
+    const rows = await res.json();
+    const list = Array.isArray(rows) ? rows.slice() : [];
+    list.sort(function (a, b) {
+      return String(a.code || '').localeCompare(String(b.code || ''));
+    });
+    for (const s of list) {
+      const o = document.createElement('option');
+      o.value = s.code || '';
+      o.textContent = (s.code || '') + ' — ' + (s.name || '');
+      sel.appendChild(o);
+    }
+    if (sel.options.length) sel.selectedIndex = 0;
+  }
+
+  function fmtTs(iso) {
+    if (iso == null || iso === '') return '—';
+    try {
+      var d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return String(iso);
+      return d.toLocaleString();
+    } catch (e) {
+      return String(iso);
+    }
+  }
+
+  async function refreshInventory() {
+    var sel = $('inv-state-select');
+    var body = $('inv-body');
+    var summary = $('inv-summary');
+    if (!sel || !body) return;
+    show($('inv-err'), '');
+    var code = (sel.value || '').trim();
+    if (!code) {
+      body.innerHTML = '';
+      if (summary) summary.textContent = '';
+      return;
+    }
+    try {
+      var data = await api('/auth/admin/inventory?state=' + encodeURIComponent(code), { method: 'GET' });
+      var rows = data.rows || [];
+      if (summary) {
+        summary.textContent =
+          rows.length +
+          ' row(s) for state ' +
+          (data.state || code) +
+          (rows.length >= 100000 ? ' (results capped at 100,000)' : '') +
+          '.';
+      }
+      body.innerHTML = '';
+      for (const r of rows) {
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escapeHtml(r.site_name || '') + '</td>' +
+          '<td><code>' + escapeHtml(String(r.resolved_site_state || '')) + '</code></td>' +
+          '<td><code style="font-size:.72rem">' + escapeHtml(String(r.session_id || '')) + '</code></td>' +
+          '<td>' + escapeHtml(fmtTs(r.session_started_at)) + '</td>' +
+          '<td>' + escapeHtml(r.technician_name || '') + '</td>' +
+          '<td><code>' + escapeHtml(String(r.unit_type || '')) + '</code></td>' +
+          '<td>' + escapeHtml(String(r.unit_index != null ? r.unit_index : '')) + '</td>' +
+          '<td><code>' + escapeHtml(String(r.device_type || '')) + '</code></td>' +
+          '<td>' + (r.cleaned ? 'Yes' : 'No') + '</td>' +
+          '<td>' + (r.damaged ? 'Yes' : 'No') + '</td>' +
+          '<td>' + escapeHtml(r.serial || '') + '</td>' +
+          '<td>' + escapeHtml(r.asset_tag || '') + '</td>' +
+          '<td>' + escapeHtml(r.printer_master_pod != null ? String(r.printer_master_pod) : '') + '</td>' +
+          '<td>' + escapeHtml(r.notes || '') + '</td>' +
+          '<td>' + escapeHtml(fmtTs(r.item_updated_at)) + '</td>';
+        body.appendChild(tr);
+      }
+    } catch (e) {
+      show($('inv-err'), e.message);
+      body.innerHTML = '';
+      if (summary) summary.textContent = '';
+    }
+  }
 
   async function refreshStats() {
     show($('stats-err'), '');
@@ -430,15 +884,13 @@
     });
   }
 
-  async function loadDeviceTypesHint() {
+  async function loadDeviceTypesList() {
     try {
       const res = await fetch('/state-configs/device-types');
       const arr = await res.json();
       cachedDeviceTypesList = Array.isArray(arr) ? arr : [];
-      $('device-types-hint').textContent = cachedDeviceTypesList.join(', ');
     } catch (e) {
       cachedDeviceTypesList = [];
-      $('device-types-hint').textContent = '';
     }
   }
 
@@ -638,7 +1090,7 @@
         await refreshStats();
         await refreshUsers();
         await refreshStates();
-        loadDeviceTypesHint();
+        loadDeviceTypesList();
         initAdminViewFromHash();
       } catch (err) {
         sessionStorage.removeItem(TOKEN_KEY);
@@ -659,6 +1111,45 @@
     sessionStorage.removeItem(ADMIN_ID_KEY);
     panel(true);
   });
+
+  var invSel = $('inv-state-select');
+  if (invSel) {
+    invSel.addEventListener('change', function () {
+      refreshInventory();
+    });
+  }
+  var invExp = $('btn-inv-export');
+  if (invExp) {
+    invExp.addEventListener('click', async function () {
+      var sel = $('inv-state-select');
+      var code = sel && sel.value ? String(sel.value).trim() : '';
+      if (!code) {
+        alert('Select a state first.');
+        return;
+      }
+      try {
+        var res = await fetch('/auth/admin/inventory-export?state=' + encodeURIComponent(code), {
+          headers: { Authorization: 'Bearer ' + token() },
+        });
+        if (!res.ok) {
+          var err = await res.json().catch(function () {
+            return {};
+          });
+          throw new Error(err.error || res.statusText || 'Export failed');
+        }
+        var blob = await res.blob();
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'inventory-' + code + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+      } catch (e) {
+        alert((e && e.message) || String(e));
+      }
+    });
+  }
 
   $('btn-state-clear').addEventListener('click', clearStateForm);
 
@@ -786,7 +1277,7 @@
       await refreshStats();
       await refreshUsers();
       await refreshStates();
-      loadDeviceTypesHint();
+      loadDeviceTypesList();
       initAdminViewFromHash();
     } catch (e) {
       sessionStorage.removeItem(TOKEN_KEY);
