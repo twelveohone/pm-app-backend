@@ -366,6 +366,12 @@
       margin-bottom: 0.5rem;
     }
 
+    .state-form-panel {
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+    }
+
     code {
       font-size: 0.85em;
       padding: 0.1em 0.35em;
@@ -566,9 +572,13 @@
       <strong>State configuration</strong>
       <p class="hint">
         Controls which device types appear for each state for workstation pods versus kiosk / non-workstation units.
+        Use <strong>Add state</strong> to create a configuration, or <strong>Edit</strong> on a row to change an existing one.
       </p>
       <div id="statecfg-list-err" class="err hidden"></div>
-      <div class="table-scroll">
+      <div class="row" style="margin-top:.75rem; justify-content:flex-end;">
+        <button type="button" id="btn-state-add">＋ Add state</button>
+      </div>
+      <div class="table-scroll" style="margin-top:.65rem;">
         <table>
           <thead>
             <tr>
@@ -582,8 +592,8 @@
           <tbody id="states-body"></tbody>
         </table>
       </div>
-      <hr class="soft" />
-      <strong id="state-form-title">Add or edit state</strong>
+      <div id="state-form-panel" class="state-form-panel hidden" role="region" aria-labelledby="state-form-title">
+      <strong id="state-form-title">Add state</strong>
       <div class="row" style="margin-top:.5rem;">
         <div>
           <label for="sc-code">Code</label>
@@ -649,8 +659,10 @@
       <div class="row">
         <button type="button" id="btn-state-save">Save</button>
         <button type="button" class="secondary" id="btn-state-clear">Clear form</button>
+        <button type="button" class="secondary" id="btn-state-form-cancel">Cancel</button>
       </div>
       <div id="statecfg-form-err" class="err hidden"></div>
+      </div>
     </div>
     </div>
   </div>
@@ -738,6 +750,19 @@
           show($('sites-err'), (e && e.message) || String(e));
         });
     }
+    if (v === 'states') {
+      clearStateForm();
+    }
+  }
+
+  function showStateFormPanel() {
+    var p = $('state-form-panel');
+    if (p) p.classList.remove('hidden');
+  }
+
+  function hideStateFormPanel() {
+    var p = $('state-form-panel');
+    if (p) p.classList.add('hidden');
   }
 
   function initAdminViewFromHash() {
@@ -1121,7 +1146,7 @@
     }
   }
 
-  function clearStateForm() {
+  function resetStateFormFields() {
     editingStateCode = null;
     $('sc-code').value = '';
     $('sc-code').disabled = false;
@@ -1136,8 +1161,13 @@
     if (ndev) ndev.value = '';
     renderWorkstationList();
     renderNonWorkstationList();
-    $('state-form-title').textContent = 'Add or edit state';
+    $('state-form-title').textContent = 'Add state';
     show($('statecfg-form-err'), '');
+  }
+
+  function clearStateForm() {
+    resetStateFormFields();
+    hideStateFormPanel();
   }
 
   function beginEditState(code) {
@@ -1162,6 +1192,7 @@
     renderNonWorkstationList();
     $('state-form-title').textContent = 'Edit state ' + s.code;
     show($('statecfg-form-err'), '');
+    showStateFormPanel();
   }
 
   async function refreshStates() {
@@ -1369,7 +1400,23 @@
       refreshHardwareRegister();
     });
   }
-  $('btn-state-clear').addEventListener('click', clearStateForm);
+  $('btn-state-clear').addEventListener('click', function () {
+    resetStateFormFields();
+    showStateFormPanel();
+  });
+
+  var btnStateAdd = $('btn-state-add');
+  if (btnStateAdd) {
+    btnStateAdd.addEventListener('click', function () {
+      resetStateFormFields();
+      showStateFormPanel();
+      try {
+        $('sc-code').focus();
+      } catch (e) {}
+    });
+  }
+
+  $('btn-state-form-cancel').addEventListener('click', clearStateForm);
 
   $('btn-ws-add').addEventListener('click', function () {
     var devIn = $('ws-add-device');
