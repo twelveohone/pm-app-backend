@@ -253,6 +253,11 @@
       background: #f1f5f9;
     }
 
+    th.inv-sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+
     .hidden {
       display: none !important;
     }
@@ -747,15 +752,15 @@
       <div id="inv-err" class="err hidden"></div>
       <p id="inv-summary" class="hint" style="margin:.5rem 0 0;"></p>
       <div class="table-scroll">
-        <table>
+        <table id="inv-table">
           <thead>
             <tr>
-              <th>Item</th>
-              <th>Asset tag</th>
-              <th>Serial</th>
-              <th>State</th>
-              <th>Site / location</th>
-              <th>Notes</th>
+              <th class="inv-sortable" data-sort-key="item">Item</th>
+              <th class="inv-sortable" data-sort-key="asset_tag">Asset tag</th>
+              <th class="inv-sortable" data-sort-key="serial">Serial</th>
+              <th class="inv-sortable" data-sort-key="state">State</th>
+              <th class="inv-sortable" data-sort-key="location">Site / location</th>
+              <th class="inv-sortable" data-sort-key="notes">Notes</th>
               <th class="admin-only">Actions</th>
             </tr>
           </thead>
@@ -1401,6 +1406,44 @@
 
   var cachedStateConfigsForSelects = null;
   var stateConfigsFetchPromise = null;
+  var inventorySortKey = 'location';
+  var inventorySortDir = 'asc';
+
+  function getInventorySortValue(r, key) {
+    if (key === 'item') return String(r.source === 'pm' ? r.device_type || '' : r.model || '');
+    if (key === 'asset_tag') return String(r.asset_tag || '');
+    if (key === 'serial') return String(r.source === 'pm' ? r.serial || '' : r.serial_number || '');
+    if (key === 'state') return String(r.source === 'pm' ? r.state || '' : r.state_code || '');
+    if (key === 'location') return String(r.source === 'pm' ? r.site_name || '' : r.location || '');
+    if (key === 'notes') return String(r.source === 'pm' ? r.notes || '' : r.pm_notes || '');
+    return '';
+  }
+
+  function sortInventoryRows(rows) {
+    var dirMul = inventorySortDir === 'desc' ? -1 : 1;
+    rows.sort(function (a, b) {
+      var av = getInventorySortValue(a, inventorySortKey).toLowerCase();
+      var bv = getInventorySortValue(b, inventorySortKey).toLowerCase();
+      if (av < bv) return -1 * dirMul;
+      if (av > bv) return 1 * dirMul;
+      return 0;
+    });
+    return rows;
+  }
+
+  function updateInventorySortHeaderLabels() {
+    var table = $('inv-table');
+    if (!table) return;
+    var heads = table.querySelectorAll('th.inv-sortable[data-sort-key]');
+    for (var i = 0; i < heads.length; i++) {
+      var h = heads[i];
+      var base = h.dataset.baseLabel || h.textContent.replace(/\s[▲▼]$/, '');
+      h.dataset.baseLabel = base;
+      var key = String(h.dataset.sortKey || '');
+      var suffix = key === inventorySortKey ? (inventorySortDir === 'asc' ? ' ▲' : ' ▼') : '';
+      h.textContent = base + suffix;
+    }
+  }
 
   function getStateConfigsListCached() {
     if (cachedStateConfigsForSelects) return Promise.resolve(cachedStateConfigsForSelects);
@@ -1474,7 +1517,7 @@
     }
     try {
       var data = await api('/auth/inventory-combined?' + inventoryCombinedQueryString(), { method: 'GET' });
-      var rows = data.rows || [];
+      var rows = sortInventoryRows((data.rows || []).slice());
       var pmCount = 0;
       var hwCount = 0;
       for (var ri = 0; ri < rows.length; ri++) {
@@ -2167,6 +2210,24 @@
       ev.preventDefault();
       refreshUnifiedInventory();
     });
+  }
+  var invTable = $('inv-table');
+  if (invTable) {
+    var invSortHeaders = invTable.querySelectorAll('th.inv-sortable[data-sort-key]');
+    for (var ih = 0; ih < invSortHeaders.length; ih++) {
+      invSortHeaders[ih].addEventListener('click', function () {
+        var key = String(this.dataset.sortKey || '');
+        if (!key) return;
+        if (inventorySortKey === key) inventorySortDir = inventorySortDir === 'asc' ? 'desc' : 'asc';
+        else {
+          inventorySortKey = key;
+          inventorySortDir = 'asc';
+        }
+        updateInventorySortHeaderLabels();
+        refreshUnifiedInventory();
+      });
+    }
+    updateInventorySortHeaderLabels();
   }
 
   var pmItemCancel = $('pm-item-edit-cancel');
