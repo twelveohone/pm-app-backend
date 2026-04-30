@@ -157,6 +157,18 @@
       gap: 0.35rem;
     }
 
+    .table-sites th.col-actions,
+    .table-sites td.col-actions {
+      text-align: right;
+      width: 1%;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    .table-sites td.col-actions .act-btns {
+      justify-content: flex-end;
+    }
+
     .row {
       display: flex;
       flex-wrap: wrap;
@@ -466,7 +478,7 @@
       <div id="sites-err" class="err hidden"></div>
       <p id="sites-summary" class="hint" style="margin:.5rem 0 0;"></p>
       <div class="table-scroll">
-        <table>
+        <table class="table-sites">
           <thead>
             <tr>
               <th>Site name</th>
@@ -476,7 +488,7 @@
               <th>WS</th>
               <th>Kiosks</th>
               <th>Site id</th>
-              <th class="admin-only">Actions</th>
+              <th class="admin-only col-actions">Actions</th>
             </tr>
           </thead>
           <tbody id="sites-body"></tbody>
@@ -974,7 +986,7 @@
         var tr = document.createElement('tr');
         var dispState = s.state != null && String(s.state).trim() !== '' ? String(s.state) : 'TN';
         var actionsCell = isPortalAdmin()
-          ? '<td><div class="act-btns"><button type="button" class="danger btn-site-del">Delete</button></div></td>'
+          ? '<td class="col-actions"><div class="act-btns"><button type="button" class="danger btn-site-del">Delete</button></div></td>'
           : '';
         tr.innerHTML =
           '<td>' + escapeHtml(s.site_name || '') + '</td>' +
