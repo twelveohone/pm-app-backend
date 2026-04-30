@@ -558,10 +558,16 @@
         Rows from the <code>sites</code> table. Blank or missing state is grouped under <strong>TN</strong> (same convention as the mobile app).
         <span class="admin-only"><strong>Edit</strong> updates the server record (mobile app will see changes on the next site sync). <strong>Delete</strong> removes the site and its PM sessions / line items from the database.</span>
       </p>
-      <div class="row" style="margin-top:.75rem;">
+      <div class="row" style="margin-top:.75rem; align-items:flex-end; flex-wrap:wrap;">
         <div>
           <label for="sites-state-select">State</label>
           <select id="sites-state-select" style="min-width:260px;"></select>
+        </div>
+        <div style="margin-left:auto; min-width:240px;">
+          <label for="sites-region-select">Region</label>
+          <select id="sites-region-select" style="min-width:240px;">
+            <option value="">All regions</option>
+          </select>
         </div>
       </div>
       <div id="sites-err" class="err hidden"></div>
@@ -1338,31 +1344,75 @@
 
   async function refreshSitesList() {
     var sel = $('sites-state-select');
+    var regionSel = $('sites-region-select');
     var body = $('sites-body');
     var summary = $('sites-summary');
     if (!sel || !body) return;
     show($('sites-err'), '');
     var code = (sel.value || '').trim().toUpperCase();
+    var selectedRegion = regionSel && regionSel.value ? String(regionSel.value).trim() : '';
     if (!code) {
       body.innerHTML = '';
       if (summary) summary.textContent = '';
+      if (regionSel) {
+        regionSel.innerHTML = '<option value="">All regions</option>';
+      }
       return;
     }
     try {
       var all = await api('/sites', { method: 'GET' });
       var rows = Array.isArray(all) ? all : [];
-      var filtered = rows.filter(function (s) {
+      var stateFiltered = rows.filter(function (s) {
         return siteRowMatchesState(s, code);
+      });
+      if (regionSel) {
+        var regionMap = new Map();
+        for (var i = 0; i < stateFiltered.length; i++) {
+          var reg = String(stateFiltered[i] && stateFiltered[i].region != null ? stateFiltered[i].region : '').trim();
+          if (!reg) continue;
+          var k = reg.toLowerCase();
+          if (!regionMap.has(k)) regionMap.set(k, reg);
+        }
+        var options = Array.from(regionMap.values()).sort(function (a, b) {
+          return a.localeCompare(b, undefined, { sensitivity: 'base' });
+        });
+        var keep = selectedRegion;
+        regionSel.innerHTML = '';
+        var allOpt = document.createElement('option');
+        allOpt.value = '';
+        allOpt.textContent = 'All regions';
+        regionSel.appendChild(allOpt);
+        for (var oi = 0; oi < options.length; oi++) {
+          var o = document.createElement('option');
+          o.value = options[oi];
+          o.textContent = options[oi];
+          regionSel.appendChild(o);
+        }
+        if (keep && options.some(function (x) { return x.toLowerCase() === keep.toLowerCase(); })) {
+          var matched = options.find(function (x) { return x.toLowerCase() === keep.toLowerCase(); });
+          regionSel.value = matched || '';
+          selectedRegion = regionSel.value;
+        } else {
+          regionSel.value = '';
+          selectedRegion = '';
+        }
+      }
+      var filtered = stateFiltered.filter(function (s) {
+        if (!selectedRegion) return true;
+        return String(s && s.region != null ? s.region : '').trim().toLowerCase() === selectedRegion.toLowerCase();
       });
       filtered.sort(function (a, b) {
         return String(a.site_name || '').localeCompare(String(b.site_name || ''), undefined, { sensitivity: 'base' });
       });
       if (summary) {
+        var regionNote = selectedRegion ? ' · region ' + selectedRegion : '';
         summary.textContent =
           filtered.length +
           ' site(s) for state ' +
           code +
-          (filtered.length < rows.length ? ' (' + rows.length + ' total in database)' : '') +
+          regionNote +
+          (filtered.length < stateFiltered.length ? ' (' + stateFiltered.length + ' in state)' : '') +
+          (stateFiltered.length < rows.length ? ' (' + rows.length + ' total in database)' : '') +
           '.';
       }
       body.innerHTML = '';
@@ -2140,6 +2190,12 @@
   var sitesSel = $('sites-state-select');
   if (sitesSel) {
     sitesSel.addEventListener('change', function () {
+      refreshSitesList();
+    });
+  }
+  var sitesRegionSel = $('sites-region-select');
+  if (sitesRegionSel) {
+    sitesRegionSel.addEventListener('change', function () {
       refreshSitesList();
     });
   }
