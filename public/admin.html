@@ -724,9 +724,8 @@
     <div class="card">
       <strong>Inventory</strong>
       <p class="hint" style="margin-top:.35rem;">
-        One list from the same database: mobile PM lines (<code>pm_items</code>) and imported register rows (<code>hardware_inventory_rows</code>) for the selected state.
-        Text filter (optional) searches site, serial, asset tag, device/model, technician, notes (PM), and location, batch, etc. (register). Rows are sorted by site or location, then serial.
-        Register-only rows need a <code>state_code</code> from your state configuration or import. <span class="admin-only">Admins edit or delete from Actions.</span>
+        Unified inventory view for PM checklist rows and register rows. Filter by state, optionally search by text, then load.
+        <span class="admin-only">Admins can edit or delete from Actions.</span>
       </p>
       <p id="hw-inv-summary" class="hint" style="margin-top:.5rem;"></p>
       <div class="row" style="margin-top:.75rem; flex-wrap:wrap;">
@@ -1714,38 +1713,12 @@
     if (!el) return;
     try {
       const data = await api('/auth/admin/hardware-inventory-summary', { method: 'GET' });
-      var parts = [
-        'Enterprise hardware register: <strong>' + (data.total != null ? data.total : '—') + '</strong> row(s) in the database.',
-      ];
-      if (data.batches && data.batches.length) {
-        parts.push(
-          ' Recent batches: ' +
-            data.batches
-              .slice(0, 12)
-              .map(function (b) {
-                return '<code>' + escapeHtml(String(b.batch)) + '</code> (' + b.count + ')';
-              })
-              .join(', ') +
-            (data.batches.length > 12 ? ' …' : '') +
-            '.'
-        );
-      }
-      if (data.byState && data.byState.length) {
-        parts.push(
-          ' By state code: ' +
-            data.byState
-              .map(function (x) {
-                return '<code>' + escapeHtml(String(x.code)) + '</code> (' + x.count + ')';
-              })
-              .join(', ') +
-            '.'
-        );
-      }
+      var parts = ['Register rows: <strong>' + (data.total != null ? data.total : '—') + '</strong>.'];
       if (data.rowsWithoutStateCode > 0) {
         parts.push(
-          ' <strong>' +
+          ' Missing state code: <strong>' +
             data.rowsWithoutStateCode +
-            '</strong> row(s) have no <code>state_code</code> (spreadsheet State didn&apos;t match a configured state).'
+            '</strong>.'
         );
       }
       el.innerHTML = parts.join('');
