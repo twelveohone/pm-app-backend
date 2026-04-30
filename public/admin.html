@@ -925,23 +925,51 @@
     return raw.toUpperCase() === codeUpper;
   }
 
+  /** One entry per state code (API or race can otherwise duplicate options). */
+  function dedupeStateConfigsByCode(rows) {
+    var map = new Map();
+    var arr = Array.isArray(rows) ? rows : [];
+    for (var i = 0; i < arr.length; i++) {
+      var s = arr[i];
+      var codeU = String(s && s.code != null ? s.code : '').trim().toUpperCase();
+      if (!codeU) continue;
+      if (!map.has(codeU)) map.set(codeU, s);
+    }
+    return Array.from(map.values()).sort(function (a, b) {
+      return String(a.code || '').localeCompare(String(b.code || ''), undefined, { sensitivity: 'base' });
+    });
+  }
+
+  var ensureSitesStateSelectInFlight = null;
+
   async function ensureSitesStateSelect() {
     var sel = $('sites-state-select');
-    if (!sel || sel.options.length > 0) return;
-    const res = await fetch('/state-configs');
-    if (!res.ok) throw new Error('Failed to load state list');
-    const rows = await res.json();
-    const list = Array.isArray(rows) ? rows.slice() : [];
-    list.sort(function (a, b) {
-      return String(a.code || '').localeCompare(String(b.code || ''));
-    });
-    for (const s of list) {
-      const o = document.createElement('option');
-      o.value = s.code || '';
-      o.textContent = (s.code || '') + ' — ' + (s.name || '');
-      sel.appendChild(o);
+    if (!sel) return;
+    if (sel.options.length > 0) return;
+    if (!ensureSitesStateSelectInFlight) {
+      ensureSitesStateSelectInFlight = (async function () {
+        try {
+          const res = await fetch('/state-configs');
+          if (!res.ok) throw new Error('Failed to load state list');
+          const rows = await res.json();
+          const list = dedupeStateConfigsByCode(rows);
+          if (sel.options.length > 0) return;
+          sel.innerHTML = '';
+          for (var j = 0; j < list.length; j++) {
+            var s = list[j];
+            var codeU = String(s.code || '').trim().toUpperCase();
+            const o = document.createElement('option');
+            o.value = codeU;
+            o.textContent = codeU + ' — ' + (s.name || '');
+            sel.appendChild(o);
+          }
+          if (sel.options.length) sel.selectedIndex = 0;
+        } finally {
+          ensureSitesStateSelectInFlight = null;
+        }
+      })();
     }
-    if (sel.options.length) sel.selectedIndex = 0;
+    await ensureSitesStateSelectInFlight;
   }
 
   async function confirmDeleteSite(siteId, siteName) {
@@ -1025,33 +1053,42 @@
     }
   }
 
+  var fillHwStateSelectInFlight = null;
+
   function fillStateSelectFromConfigs(sel, opts) {
     var leadingBlank = opts && opts.leadingBlank;
     if (!sel || sel.options.length > 0) return Promise.resolve();
-    return fetch('/state-configs')
-      .then(function (res) {
-        if (!res.ok) throw new Error('Failed to load state list');
-        return res.json();
-      })
-      .then(function (rows) {
-        const list = Array.isArray(rows) ? rows.slice() : [];
-        list.sort(function (a, b) {
-          return String(a.code || '').localeCompare(String(b.code || ''));
+    if (!fillHwStateSelectInFlight) {
+      fillHwStateSelectInFlight = fetch('/state-configs')
+        .then(function (res) {
+          if (!res.ok) throw new Error('Failed to load state list');
+          return res.json();
+        })
+        .then(function (rows) {
+          const list = dedupeStateConfigsByCode(rows);
+          if (sel.options.length > 0) return;
+          sel.innerHTML = '';
+          if (leadingBlank) {
+            const blank = document.createElement('option');
+            blank.value = '';
+            blank.textContent = 'Select state…';
+            sel.appendChild(blank);
+          }
+          for (var i = 0; i < list.length; i++) {
+            var s = list[i];
+            var codeU = String(s.code || '').trim().toUpperCase();
+            const o = document.createElement('option');
+            o.value = codeU;
+            o.textContent = codeU + ' — ' + (s.name || '');
+            sel.appendChild(o);
+          }
+          if (sel.options.length) sel.selectedIndex = 0;
+        })
+        .finally(function () {
+          fillHwStateSelectInFlight = null;
         });
-        if (leadingBlank) {
-          const blank = document.createElement('option');
-          blank.value = '';
-          blank.textContent = 'Select state…';
-          sel.appendChild(blank);
-        }
-        for (const s of list) {
-          const o = document.createElement('option');
-          o.value = s.code || '';
-          o.textContent = (s.code || '') + ' — ' + (s.name || '');
-          sel.appendChild(o);
-        }
-        if (sel.options.length) sel.selectedIndex = 0;
-      });
+    }
+    return fillHwStateSelectInFlight;
   }
 
   async function ensureHardwareRegStateSelect() {
