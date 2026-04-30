@@ -736,9 +736,28 @@
     return h;
   }
 
+  /** Invalid or expired JWT: clear storage and return to sign-in (not used for wrong password on /auth/login). */
+  function forceLogoutToLogin(message) {
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(ADMIN_ID_KEY);
+    portalRole = null;
+    panel(true);
+    show($('login-err'), message || 'Your session expired. Please sign in again.');
+  }
+
   async function api(path, opts) {
-    const res = await fetch(path, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
+    const optsObj = opts || {};
+    const res = await fetch(path, { ...optsObj, headers: { ...authHeaders(), ...(optsObj.headers || {}) } });
     const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      var p = typeof path === 'string' ? path : '';
+      if (p !== '/auth/login' && p !== '/auth/register') {
+        var expiredMsg = 'Your session expired. Please sign in again.';
+        forceLogoutToLogin(expiredMsg);
+        throw new Error(expiredMsg);
+      }
+      throw new Error(data.error || res.statusText || 'Request failed');
+    }
     if (!res.ok) throw new Error(data.error || res.statusText || 'Request failed');
     return data;
   }
