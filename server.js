@@ -487,6 +487,17 @@ async function ensureAuthTables() {
     )
   `);
 
+  try {
+    const migrated = await pool.query(
+      `UPDATE users SET role = 'tech', updated_at = NOW() WHERE LOWER(TRIM(role)) = 'manager'`
+    );
+    if (migrated.rowCount > 0) {
+      console.log(`Normalized ${migrated.rowCount} user(s) from role manager → tech`);
+    }
+  } catch (e) {
+    console.warn('Could not normalize manager roles:', e.message);
+  }
+
   await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
 
   const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
@@ -723,8 +734,8 @@ app.post('/auth/users', authRequired, adminRequired, async (req, res) => {
   if (!fullName || !email || !password) {
     return res.status(400).json({ error: 'full_name, email, and password are required' });
   }
-  if (!['tech', 'manager', 'admin'].includes(role)) {
-    return res.status(400).json({ error: 'role must be tech, manager, or admin' });
+  if (!['tech', 'admin'].includes(role)) {
+    return res.status(400).json({ error: 'role must be tech or admin' });
   }
 
   try {
@@ -784,8 +795,8 @@ app.patch('/auth/users/:id', authRequired, adminRequired, async (req, res) => {
 
   if (roleIn !== undefined) {
     const role = String(roleIn).trim().toLowerCase();
-    if (!['tech', 'manager', 'admin'].includes(role)) {
-      return res.status(400).json({ error: 'role must be tech, manager, or admin' });
+    if (!['tech', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'role must be tech or admin' });
     }
     sets.push(`role = $${i++}`);
     values.push(role);

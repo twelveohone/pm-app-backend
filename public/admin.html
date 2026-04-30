@@ -489,9 +489,8 @@
     <div class="card">
       <strong>Users</strong>
       <p class="hint" style="margin-top:.35rem;line-height:1.5;">
-        <strong>tech</strong> — Field technicians: mobile app access to sync sites, PM sessions, and checklist data. Same API permissions as <strong>manager</strong> today.<br />
-        <strong>manager</strong> — Same backend access as tech; use to mark leads or supervisors. (Reserved for future reporting or approvals.)<br />
-        <strong>admin</strong> — Web portal: user management, state/device configuration, inventory summaries, and deleting sites from this UI. Mobile app site add/edit/remove stays available to all signed-in roles.
+        <strong>tech</strong> — Mobile app: sync sites, PM sessions, and checklist data; read-only web portal (overview, sites, hardware, state list) and change own password. Can add/update/remove sites from the app when signed in.<br />
+        <strong>admin</strong> — Everything tech has, plus web portal user management, state/device configuration, database summary, site delete in the portal, and admin APIs.
       </p>
       <div id="users-err" class="err hidden"></div>
       <div class="table-scroll">
@@ -516,7 +515,7 @@
         <div><label>Name</label><input id="nu-name" /></div>
         <div><label>Email</label><input id="nu-email" type="email" /></div>
         <div><label>Password</label><input id="nu-pass" type="password" /></div>
-        <div><label>Role</label><select id="nu-role"><option value="tech">tech</option><option value="manager">manager</option><option value="admin">admin</option></select></div>
+        <div><label>Role</label><select id="nu-role"><option value="tech">tech</option><option value="admin">admin</option></select></div>
         <button type="button" id="btn-create">Create</button>
       </div>
       <div id="create-err" class="err hidden"></div>
@@ -1364,7 +1363,7 @@
           '<td>' + escapeHtml(u.email) + '</td>' +
           '<td>' + escapeHtml(u.full_name) + '</td>' +
           '<td><select data-id="' + u.id + '" class="role-sel">' +
-            ['tech','manager','admin'].map(function (r) {
+            ['tech','admin'].map(function (r) {
               return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + r + '</option>';
             }).join('') +
           '</select></td>' +
