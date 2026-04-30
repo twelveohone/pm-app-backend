@@ -1144,6 +1144,146 @@ async function queryAdminInventory(poolConn, stateCodeRaw, siteNameRaw) {
   return { state: stateCode, site: siteNeedle || null, rows: result.rows };
 }
 
+/** PM checklist rows for a state, optional text match across common columns. */
+async function queryAdminPmRowsWithQ(poolConn, stateCodeRaw, qRaw) {
+  const stateCode = String(stateCodeRaw || '')
+    .trim()
+    .toUpperCase();
+  if (!stateCode || !/^[A-Z0-9]{2,10}$/.test(stateCode)) {
+    const err = new Error('INVALID_STATE');
+    err.code = 'INVALID_STATE';
+    throw err;
+  }
+  const q = String(qRaw || '').trim();
+  const params = [stateCode];
+  let textClause = '';
+  if (q) {
+    params.push(q);
+    textClause = `AND (
+      position(lower($2) in lower(coalesce(s.site_name, ''))) > 0
+      OR position(lower($2) in lower(coalesce(pi.serial, ''))) > 0
+      OR position(lower($2) in lower(coalesce(pi.asset_tag, ''))) > 0
+      OR position(lower($2) in lower(coalesce(pi.device_type, ''))) > 0
+      OR position(lower($2) in lower(coalesce(pi.notes, ''))) > 0
+      OR position(lower($2) in lower(coalesce(ps.technician_name, ''))) > 0
+    )`;
+  }
+  const result = await poolConn.query(
+    `SELECT
+      pi.id AS item_id,
+      pi.session_id,
+      pi.unit_type,
+      pi.unit_index,
+      pi.device_type,
+      pi.cleaned,
+      pi.damaged,
+      pi.notes,
+      pi.serial,
+      pi.asset_tag,
+      pi.printer_master_pod,
+      pi.updated_at AS item_updated_at,
+      ps.technician_name,
+      ps.started_at AS session_started_at,
+      COALESCE(s.site_name, '(unknown site)') AS site_name,
+      COALESCE(NULLIF(TRIM(s.state), ''), 'TN') AS resolved_site_state
+    FROM pm_items pi
+    INNER JOIN pm_sessions ps ON pi.session_id = ps.id
+    LEFT JOIN sites s ON ps.site_id = s.id
+    WHERE UPPER(COALESCE(NULLIF(TRIM(s.state), ''), 'TN')) = $1
+    ${textClause}
+    ${ADMIN_INVENTORY_ORDER_BY}
+    LIMIT 100000`,
+    params
+  );
+  return result.rows;
+}
+
+/** One list: mobile PM line items + imported hardware register rows (same DB), filtered by state and optional q. */
+async function queryInventoryCombined(poolConn, stateCodeRaw, qRaw) {
+  const stateCode = String(stateCodeRaw || '')
+    .trim()
+    .toUpperCase();
+  if (!stateCode || !/^[A-Z0-9]{2,10}$/.test(stateCode)) {
+    const err = new Error('INVALID_STATE');
+    err.code = 'INVALID_STATE';
+    throw err;
+  }
+  const qTrim = String(qRaw || '').trim();
+  const pmRows = await queryAdminPmRowsWithQ(poolConn, stateCode, qTrim);
+  const hwParams = [stateCode];
+  let hwTextClause = '';
+  if (qTrim) {
+    hwParams.push(qTrim);
+    hwTextClause = hardwareRegisterTextFilterClause(2);
+  }
+  hwParams.push(100000);
+  const hwLimitIdx = hwParams.length;
+  const hwRes = await poolConn.query(
+    `SELECT id, asset_tag, serial_number, model, model_category, location, state_name, state_code, import_batch,
+            pm_notes, pm_cleaned, pm_damaged
+     FROM hardware_inventory_rows
+     WHERE state_code = $1
+     ${hwTextClause}
+     ORDER BY location ASC NULLS LAST, asset_tag ASC NULLS LAST, serial_number ASC NULLS LAST
+     LIMIT $${hwLimitIdx}`,
+    hwParams
+  );
+  const rows = [];
+  for (const r of pmRows) {
+    rows.push({
+      source: 'pm',
+      item_id: r.item_id,
+      session_id: r.session_id,
+      site_name: r.site_name,
+      state: r.resolved_site_state,
+      technician_name: r.technician_name,
+      device_type: r.device_type,
+      unit_type: r.unit_type,
+      unit_index: r.unit_index,
+      serial: r.serial,
+      asset_tag: r.asset_tag,
+      notes: r.notes,
+      cleaned: r.cleaned,
+      damaged: r.damaged,
+      printer_master_pod: r.printer_master_pod,
+    });
+  }
+  for (const r of hwRes.rows) {
+    rows.push({
+      source: 'hw',
+      id: r.id,
+      location: r.location,
+      state_code: r.state_code,
+      model: r.model,
+      model_category: r.model_category,
+      serial_number: r.serial_number,
+      asset_tag: r.asset_tag,
+      state_name: r.state_name,
+      import_batch: r.import_batch,
+      pm_notes: r.pm_notes,
+      pm_cleaned: r.pm_cleaned,
+      pm_damaged: r.pm_damaged,
+    });
+  }
+  function sortKey(row) {
+    const where = row.source === 'pm' ? row.site_name || '' : row.location || '';
+    const ser = row.source === 'pm' ? row.serial || '' : row.serial_number || '';
+    const tag = row.asset_tag || '';
+    const id = row.source === 'pm' ? row.item_id || '' : row.id || '';
+    return [where.toLowerCase(), ser.toLowerCase(), tag.toLowerCase(), row.source, id.toLowerCase()];
+  }
+  rows.sort((a, b) => {
+    const ka = sortKey(a);
+    const kb = sortKey(b);
+    for (let i = 0; i < ka.length; i++) {
+      if (ka[i] < kb[i]) return -1;
+      if (ka[i] > kb[i]) return 1;
+    }
+    return 0;
+  });
+  return { state: stateCode, q: qTrim || null, count: rows.length, rows };
+}
+
 function csvEscapeCell(val) {
   if (val == null) return '';
   const s = String(val);
@@ -1201,6 +1341,78 @@ app.get('/auth/admin/inventory-export', authRequired, adminRequired, async (req,
             .slice(0, 48)
         : '';
     res.setHeader('Content-Disposition', `attachment; filename="inventory-${state}${siteSlug}.csv"`);
+    res.send(body);
+  } catch (err) {
+    if (err.code === 'INVALID_STATE') {
+      return res.status(400).json({ error: 'state query param is required (2–10 letter or digit code)' });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to export inventory' });
+  }
+});
+
+/** Single listing: PM checklist rows + hardware register for a state (same database). */
+app.get('/auth/inventory-combined', authRequired, async (req, res) => {
+  try {
+    const data = await queryInventoryCombined(pool, req.query.state, req.query.q);
+    return res.json(data);
+  } catch (err) {
+    if (err.code === 'INVALID_STATE') {
+      return res.status(400).json({ error: 'state query param is required (2–10 letter or digit code)' });
+    }
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to load inventory' });
+  }
+});
+
+app.get('/auth/inventory-combined-export', authRequired, async (req, res) => {
+  try {
+    const { state, q, rows } = await queryInventoryCombined(pool, req.query.state, req.query.q);
+    const headers = [
+      'source',
+      'state',
+      'site_or_location',
+      'detail',
+      'serial',
+      'asset_tag',
+      'meta',
+      'row_id',
+    ];
+    const lines = [headers.join(',')];
+    for (const row of rows) {
+      const siteOrLoc = row.source === 'pm' ? row.site_name : row.location;
+      const detail = row.source === 'pm' ? row.device_type : row.model;
+      const serial = row.source === 'pm' ? row.serial : row.serial_number;
+      const meta =
+        row.source === 'pm'
+          ? `tech:${row.technician_name || ''}; notes:${row.notes || ''}; cleaned:${row.cleaned}; damaged:${row.damaged}`
+          : `category:${row.model_category || ''}; batch:${row.import_batch || ''}; file_state:${row.state_name || ''}`;
+      const rid = row.source === 'pm' ? row.item_id : row.id;
+      const st = row.source === 'pm' ? row.state : row.state_code;
+      const lineObj = {
+        source: row.source,
+        state: st,
+        site_or_location: siteOrLoc,
+        detail,
+        serial,
+        asset_tag: row.asset_tag,
+        meta,
+        row_id: rid,
+      };
+      lines.push(headers.map((h) => csvEscapeCell(lineObj[h])).join(','));
+    }
+    const body = lines.join('\r\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    const qSlug =
+      q && String(q).trim()
+        ? '-' +
+          String(q)
+            .trim()
+            .replace(/[^a-zA-Z0-9]+/g, '_')
+            .replace(/^_|_$/g, '')
+            .slice(0, 48)
+        : '';
+    res.setHeader('Content-Disposition', `attachment; filename="inventory-combined-${state}${qSlug}.csv"`);
     res.send(body);
   } catch (err) {
     if (err.code === 'INVALID_STATE') {

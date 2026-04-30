@@ -512,7 +512,7 @@
     <div class="toolbar">
       <div class="toolbar-text">
         <h1 id="portal-title">PM Portal</h1>
-        <p class="tagline" id="portal-tagline">View sites, summaries, and hardware. Change your password on the Account tab.</p>
+        <p class="tagline" id="portal-tagline">View sites, summaries, and inventory. Change your password on the Account tab.</p>
       </div>
       <button type="button" class="secondary" id="btn-logout">Sign out</button>
     </div>
@@ -531,7 +531,7 @@
         Account
       </button>
       <button type="button" class="admin-nav-item" data-admin-view="inventory" role="tab" aria-selected="false" id="tab-inventory">
-        Hardware
+        Inventory
       </button>
       <button type="button" class="admin-nav-item" data-admin-view="states" role="tab" aria-selected="false" id="tab-states">
         State &amp; devices
@@ -670,7 +670,7 @@
     <div class="card">
       <strong>Users</strong>
       <p class="hint" style="margin-top:.35rem;line-height:1.5;">
-        <strong>tech</strong> — Mobile app: sync sites, PM sessions, and checklist data; read-only web portal (overview, sites, hardware, state list) and change own password. Can add/update/remove sites from the app when signed in.<br />
+        <strong>tech</strong> — Mobile app: sync sites, PM sessions, and checklist data; read-only web portal (overview, sites, inventory, state list) and change own password. Can add/update/remove sites from the app when signed in.<br />
         <strong>admin</strong> — Everything tech has, plus web portal user management, state/device configuration, database summary, site delete in the portal, and admin APIs.
       </p>
       <div id="users-err" class="err hidden"></div>
@@ -721,109 +721,47 @@
     </div>
 
     <div id="admin-view-inventory" class="admin-view hidden" role="tabpanel" aria-labelledby="tab-inventory">
-    <div class="card admin-only">
-      <strong>PM checklist items</strong>
-      <p class="hint" style="margin-top:.35rem;">
-        Rows from technician PM sessions (<code>pm_items</code>), filtered by the site&apos;s state. Optionally narrow by a substring of <strong>site name</strong> (case-insensitive). Edits sync to the enterprise hardware register when serial or asset tag matches.
-        Deleting removes the checklist row only; use hardware actions below to change imported register data.
-      </p>
-      <div class="row" style="margin-top:.75rem; flex-wrap:wrap;">
-        <div>
-          <label for="pm-inv-state-select">State</label>
-          <select id="pm-inv-state-select" style="min-width:240px;"></select>
-        </div>
-        <div style="flex:1; min-width:220px; max-width:400px;">
-          <label for="pm-inv-site-filter">Site name contains</label>
-          <input id="pm-inv-site-filter" type="text" placeholder="e.g. Dave's Vehicle (optional)" autocomplete="off" style="width:100%; max-width:400px;" />
-        </div>
-        <div style="align-self:flex-end;">
-          <button type="button" class="secondary" id="btn-pm-inv-load">Load</button>
-        </div>
-        <div style="align-self:flex-end;">
-          <button type="button" class="secondary" id="btn-pm-inv-csv">Download CSV</button>
-        </div>
-      </div>
-      <div id="pm-inv-err" class="err hidden"></div>
-      <p id="pm-inv-summary" class="hint" style="margin:.5rem 0 0;"></p>
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Site</th>
-              <th>Technician</th>
-              <th>Device</th>
-              <th>Serial</th>
-              <th>Asset tag</th>
-              <th>Notes</th>
-              <th>Cleaned</th>
-              <th>Damaged</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="pm-inv-body"></tbody>
-        </table>
-      </div>
-    </div>
     <div class="card">
-      <strong>Hardware register</strong>
+      <strong>Inventory</strong>
       <p class="hint" style="margin-top:.35rem;">
-        Enterprise asset rows in <code>hardware_inventory_rows</code> (bulk import). Choose a <code>state_code</code> (TN, MA, …), then optionally narrow rows with <strong>Text filter</strong> (matches location, asset tag, serial, model, category, state name from file, or import batch — case-insensitive).
-        Rows without a matching <strong>State &amp; devices</strong> name/code have no <code>state_code</code> and won&apos;t show in a state filter.
-        <span class="admin-only">Admins can edit or delete rows in the table below.</span>
-        Technicians use the mobile app for ongoing PM updates.
+        One list from the same database: mobile PM lines (<code>pm_items</code>) and imported register rows (<code>hardware_inventory_rows</code>) for the selected state.
+        Text filter (optional) searches site, serial, asset tag, device/model, technician, notes (PM), and location, batch, etc. (register). Rows are sorted by site or location, then serial.
+        Register-only rows need a <code>state_code</code> from your state configuration or import. <span class="admin-only">Admins edit or delete from Actions.</span>
       </p>
       <p id="hw-inv-summary" class="hint" style="margin-top:.5rem;"></p>
       <div class="row" style="margin-top:.75rem; flex-wrap:wrap;">
         <div>
-          <label for="hw-reg-state-select">State</label>
-          <select id="hw-reg-state-select" style="min-width:240px;"></select>
+          <label for="inv-state-select">State</label>
+          <select id="inv-state-select" style="min-width:240px;"></select>
         </div>
-        <div>
-          <label for="hw-reg-sort-select">Sort by</label>
-          <select id="hw-reg-sort-select" style="min-width:200px;">
-            <option value="category">Model category</option>
-            <option value="location">Location</option>
-            <option value="asset_tag">Asset tag</option>
-            <option value="serial">Serial number</option>
-            <option value="model">Model</option>
-            <option value="batch">Import batch</option>
-          </select>
-        </div>
-        <div>
-          <label for="hw-reg-dir-select">Order</label>
-          <select id="hw-reg-dir-select" style="min-width:140px;">
-            <option value="asc">A → Z / low → high</option>
-            <option value="desc">Z → A / high → low</option>
-          </select>
+        <div style="flex:1; min-width:220px; max-width:520px;">
+          <label for="inv-text-filter">Text filter (optional)</label>
+          <input id="inv-text-filter" type="text" placeholder="Site, serial, asset tag, model, location…" autocomplete="off" style="width:100%; max-width:520px;" />
         </div>
         <div style="align-self:flex-end;">
-          <button type="button" class="secondary" id="btn-hw-reg-load">Load rows</button>
+          <button type="button" class="secondary" id="btn-inv-load">Load</button>
+        </div>
+        <div style="align-self:flex-end;">
+          <button type="button" class="secondary" id="btn-inv-csv">Download CSV</button>
         </div>
       </div>
-      <div class="row" style="margin-top:.65rem;">
-        <div style="flex:1; min-width:220px; max-width:520px;">
-          <label for="hw-reg-text-filter">Text filter (optional)</label>
-          <input id="hw-reg-text-filter" type="text" placeholder="e.g. Dave's Vehicle, asset tag, or serial" autocomplete="off" style="width:100%; max-width:520px;" />
-        </div>
-      </div>
-      <div id="hw-reg-err" class="err hidden"></div>
-      <p id="hw-reg-summary" class="hint" style="margin:.5rem 0 0;"></p>
+      <div id="inv-err" class="err hidden"></div>
+      <p id="inv-summary" class="hint" style="margin:.5rem 0 0;"></p>
       <div class="table-scroll">
         <table>
           <thead>
             <tr>
-              <th>Asset tag</th>
+              <th>Source</th>
+              <th>Site / location</th>
+              <th>State</th>
+              <th>Item</th>
               <th>Serial</th>
-              <th>Model</th>
-              <th>Category</th>
-              <th>Location</th>
-              <th>State (file)</th>
-              <th>Code</th>
-              <th>Batch</th>
+              <th>Asset tag</th>
+              <th>Details</th>
               <th class="admin-only">Actions</th>
             </tr>
           </thead>
-          <tbody id="hw-reg-body"></tbody>
+          <tbody id="inv-body"></tbody>
         </table>
       </div>
     </div>
@@ -1064,8 +1002,8 @@
     var tag = $('portal-tagline');
     if (tag) {
       tag.textContent = isPortalAdmin()
-        ? 'Backend administration — users, sites, state configuration, PM checklist items, and enterprise hardware register (view, edit, delete).'
-        : 'View sites, summaries, and hardware. Change your password on the Account tab. Ask an admin for user or configuration changes.';
+        ? 'Backend administration — users, sites, state configuration, and unified inventory (view, edit, delete).'
+        : 'View sites, summaries, and inventory. Change your password on the Account tab. Ask an admin for user or configuration changes.';
     }
     var h = $('portal-title');
     if (h) h.textContent = isPortalAdmin() ? 'PM Admin' : 'PM Portal';
@@ -1169,19 +1107,12 @@
     } catch (e) {}
     if (v === 'inventory') {
       refreshHardwareInventorySummary().catch(function () {});
-      ensurePmInvStateSelect()
+      ensureInvStateSelect()
         .then(function () {
-          if (isPortalAdmin()) return refreshPmInventory();
+          return refreshUnifiedInventory();
         })
         .catch(function (e) {
-          show($('pm-inv-err'), (e && e.message) || String(e));
-        });
-      ensureHardwareRegStateSelect()
-        .then(function () {
-          return refreshHardwareRegister();
-        })
-        .catch(function (e) {
-          show($('hw-reg-err'), (e && e.message) || String(e));
+          show($('inv-err'), (e && e.message) || String(e));
         });
     }
     if (v === 'sites') {
@@ -1516,42 +1447,27 @@
     });
   }
 
-  async function ensureHardwareRegStateSelect() {
-    var sel = $('hw-reg-state-select');
+  async function ensureInvStateSelect() {
+    var sel = $('inv-state-select');
     await fillStateSelectFromConfigs(sel, { leadingBlank: true });
   }
 
-  async function ensurePmInvStateSelect() {
-    var sel = $('pm-inv-state-select');
-    await fillStateSelectFromConfigs(sel, { leadingBlank: true });
-  }
-
-  function hardwareRegisterQueryString() {
-    var sel = $('hw-reg-state-select');
-    var sortSel = $('hw-reg-sort-select');
-    var dirSel = $('hw-reg-dir-select');
-    var filterIn = $('hw-reg-text-filter');
+  function inventoryCombinedQueryString() {
+    var sel = $('inv-state-select');
+    var filterIn = $('inv-text-filter');
     var code = sel && sel.value ? String(sel.value).trim() : '';
-    var sort = sortSel && sortSel.value ? String(sortSel.value) : 'category';
-    var dir = dirSel && dirSel.value ? String(dirSel.value) : 'asc';
     var q = filterIn && filterIn.value ? String(filterIn.value).trim() : '';
-    var parts =
-      'state=' +
-      encodeURIComponent(code) +
-      '&sort=' +
-      encodeURIComponent(sort) +
-      '&dir=' +
-      encodeURIComponent(dir);
+    var parts = 'state=' + encodeURIComponent(code);
     if (q) parts += '&q=' + encodeURIComponent(q);
     return parts;
   }
 
-  async function refreshHardwareRegister() {
-    var sel = $('hw-reg-state-select');
-    var body = $('hw-reg-body');
-    var summary = $('hw-reg-summary');
+  async function refreshUnifiedInventory() {
+    var sel = $('inv-state-select');
+    var body = $('inv-body');
+    var summary = $('inv-summary');
     if (!sel || !body) return;
-    show($('hw-reg-err'), '');
+    show($('inv-err'), '');
     var code = (sel.value || '').trim();
     if (!code) {
       body.innerHTML = '';
@@ -1559,130 +1475,102 @@
       return;
     }
     try {
-      var data = await api('/auth/admin/hardware-register?' + hardwareRegisterQueryString(), { method: 'GET' });
+      var data = await api('/auth/inventory-combined?' + inventoryCombinedQueryString(), { method: 'GET' });
       var rows = data.rows || [];
+      var pmCount = 0;
+      var hwCount = 0;
+      for (var ri = 0; ri < rows.length; ri++) {
+        if (rows[ri].source === 'pm') pmCount += 1;
+        else hwCount += 1;
+      }
       if (summary) {
-        var filterNote = data.q ? ' · text contains “' + data.q + '”' : '';
+        var filterNote = data.q ? ' · text “' + data.q + '”' : '';
         summary.textContent =
           rows.length +
-          ' hardware register row(s) for state ' +
+          ' row(s) for state ' +
           (data.state || code) +
           filterNote +
-          ', sorted by ' +
-          (data.sort || 'category') +
-          ' (' +
-          (data.dir === 'desc' ? 'desc' : 'asc') +
-          ').';
+          ' — ' +
+          pmCount +
+          ' mobile PM, ' +
+          hwCount +
+          ' register.';
       }
       body.innerHTML = '';
       for (const r of rows) {
         var tr = document.createElement('tr');
         var adminTd = '';
         if (isPortalAdmin()) {
-          adminTd =
-            '<td><button type="button" class="secondary btn-hw-reg-edit">Edit</button> ' +
-            '<button type="button" class="danger btn-hw-reg-del">Delete</button></td>';
+          if (r.source === 'pm') {
+            adminTd =
+              '<td><button type="button" class="secondary btn-inv-pm-edit">Edit</button> ' +
+              '<button type="button" class="danger btn-inv-pm-del">Delete</button></td>';
+          } else {
+            adminTd =
+              '<td><button type="button" class="secondary btn-inv-hw-edit">Edit</button> ' +
+              '<button type="button" class="danger btn-inv-hw-del">Delete</button></td>';
+          }
         }
+        var srcLabel = r.source === 'pm' ? 'Mobile PM' : 'Register';
+        var where = r.source === 'pm' ? r.site_name : r.location;
+        var st = r.source === 'pm' ? r.state : r.state_code;
+        var item = r.source === 'pm' ? r.device_type : r.model;
+        var ser = r.source === 'pm' ? r.serial : r.serial_number;
+        var details =
+          r.source === 'pm'
+            ? escapeHtml(String(r.technician_name || '')) +
+              (r.notes ? ' · ' + escapeHtml(String(r.notes)) : '') +
+              ' · c/d ' +
+              (r.cleaned ? '1' : '0') +
+              '/' +
+              (r.damaged ? '1' : '0')
+            : escapeHtml(String(r.model_category || '')) +
+              (r.import_batch ? ' · batch ' + escapeHtml(String(r.import_batch)) : '') +
+              (r.state_name ? ' · file state ' + escapeHtml(String(r.state_name)) : '');
         tr.innerHTML =
-          '<td>' + escapeHtml(r.asset_tag || '') + '</td>' +
-          '<td>' + escapeHtml(r.serial_number || '') + '</td>' +
-          '<td>' + escapeHtml(r.model || '') + '</td>' +
-          '<td>' + escapeHtml(r.model_category || '') + '</td>' +
-          '<td>' + escapeHtml(r.location || '') + '</td>' +
-          '<td>' + escapeHtml(r.state_name || '') + '</td>' +
-          '<td><code>' + escapeHtml(String(r.state_code || '')) + '</code></td>' +
-          '<td><code style="font-size:.72rem">' + escapeHtml(String(r.import_batch || '')) + '</code></td>' +
+          '<td><code>' + escapeHtml(srcLabel) + '</code></td>' +
+          '<td>' + escapeHtml(String(where || '')) + '</td>' +
+          '<td><code>' + escapeHtml(String(st || '')) + '</code></td>' +
+          '<td><code>' + escapeHtml(String(item || '')) + '</code></td>' +
+          '<td>' + escapeHtml(String(ser || '')) + '</td>' +
+          '<td>' + escapeHtml(String(r.asset_tag || '')) + '</td>' +
+          '<td style="font-size:.82rem;">' + details + '</td>' +
           adminTd;
         if (isPortalAdmin()) {
-          var editHw = tr.querySelector('.btn-hw-reg-edit');
-          var delHw = tr.querySelector('.btn-hw-reg-del');
-          if (editHw) {
-            editHw.addEventListener('click', function () {
-              openHwRegEditModal(r);
-            });
-          }
-          if (delHw) {
-            delHw.addEventListener('click', function () {
-              confirmDeleteHwRegRow(r);
-            });
+          if (r.source === 'pm') {
+            var eb = tr.querySelector('.btn-inv-pm-edit');
+            var db = tr.querySelector('.btn-inv-pm-del');
+            if (eb)
+              eb.addEventListener('click', function () {
+                openPmItemEditModal(r);
+              });
+            if (db)
+              db.addEventListener('click', function () {
+                confirmDeletePmItem(r);
+              });
+          } else {
+            var eh = tr.querySelector('.btn-inv-hw-edit');
+            var dh = tr.querySelector('.btn-inv-hw-del');
+            if (eh)
+              eh.addEventListener('click', function () {
+                openHwRegEditModal(r);
+              });
+            if (dh)
+              dh.addEventListener('click', function () {
+                confirmDeleteHwRegRow(r);
+              });
           }
         }
         body.appendChild(tr);
       }
     } catch (e) {
-      show($('hw-reg-err'), e.message);
+      show($('inv-err'), e.message);
       body.innerHTML = '';
       if (summary) summary.textContent = '';
     }
   }
 
   var editingPmItemId = '';
-
-  function pmInventoryQueryString() {
-    var sel = $('pm-inv-state-select');
-    var siteIn = $('pm-inv-site-filter');
-    var code = sel && sel.value ? String(sel.value).trim() : '';
-    var site = siteIn && siteIn.value ? String(siteIn.value).trim() : '';
-    var q = 'state=' + encodeURIComponent(code);
-    if (site) q += '&site=' + encodeURIComponent(site);
-    return q;
-  }
-
-  async function refreshPmInventory() {
-    var sel = $('pm-inv-state-select');
-    var body = $('pm-inv-body');
-    var summary = $('pm-inv-summary');
-    if (!sel || !body) return;
-    if (!isPortalAdmin()) return;
-    show($('pm-inv-err'), '');
-    var code = (sel.value || '').trim();
-    if (!code) {
-      body.innerHTML = '';
-      if (summary) summary.textContent = '';
-      return;
-    }
-    try {
-      var data = await api('/auth/admin/inventory?' + pmInventoryQueryString(), { method: 'GET' });
-      var rows = data.rows || [];
-      if (summary) {
-        var sitePart = data.site ? ' · site name contains “' + data.site + '”' : '';
-        summary.textContent =
-          rows.length + ' PM checklist item(s) for state ' + (data.state || code) + sitePart + '.';
-      }
-      body.innerHTML = '';
-      for (const r of rows) {
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-          '<td>' + escapeHtml(String(r.site_name || '')) + '</td>' +
-          '<td>' + escapeHtml(String(r.technician_name || '')) + '</td>' +
-          '<td><code>' + escapeHtml(String(r.device_type || '')) + '</code></td>' +
-          '<td>' + escapeHtml(String(r.serial || '')) + '</td>' +
-          '<td>' + escapeHtml(String(r.asset_tag || '')) + '</td>' +
-          '<td>' + escapeHtml(String(r.notes || '')) + '</td>' +
-          '<td>' + (r.cleaned ? '1' : '0') + '</td>' +
-          '<td>' + (r.damaged ? '1' : '0') + '</td>' +
-          '<td><button type="button" class="secondary btn-pm-item-edit">Edit</button> ' +
-          '<button type="button" class="danger btn-pm-item-del">Delete</button></td>';
-        var editB = tr.querySelector('.btn-pm-item-edit');
-        var delB = tr.querySelector('.btn-pm-item-del');
-        if (editB) {
-          editB.addEventListener('click', function () {
-            openPmItemEditModal(r);
-          });
-        }
-        if (delB) {
-          delB.addEventListener('click', function () {
-            confirmDeletePmItem(r);
-          });
-        }
-        body.appendChild(tr);
-      }
-    } catch (e) {
-      show($('pm-inv-err'), e.message);
-      body.innerHTML = '';
-      if (summary) summary.textContent = '';
-    }
-  }
 
   function openPmItemEditModal(r) {
     editingPmItemId = String(r.item_id || '');
@@ -1721,7 +1609,7 @@
     if (!confirm('Delete this PM checklist row from the database? This cannot be undone.')) return;
     api('/auth/admin/pm-items/' + encodeURIComponent(id), { method: 'DELETE' })
       .then(function () {
-        return refreshPmInventory();
+        return refreshUnifiedInventory();
       })
       .then(function () {
         return refreshStats();
@@ -1731,15 +1619,15 @@
       });
   }
 
-  async function downloadPmInventoryCsv() {
-    var sel = $('pm-inv-state-select');
+  async function downloadInventoryCombinedCsv() {
+    var sel = $('inv-state-select');
     var code = sel && sel.value ? String(sel.value).trim() : '';
     if (!code) {
       alert('Choose a state first.');
       return;
     }
     try {
-      var res = await fetch('/auth/admin/inventory-export?' + pmInventoryQueryString(), {
+      var res = await fetch('/auth/inventory-combined-export?' + inventoryCombinedQueryString(), {
         headers: { Authorization: 'Bearer ' + token() },
       });
       if (res.status === 401) {
@@ -1757,8 +1645,7 @@
       a.href = URL.createObjectURL(blob);
       var cd = res.headers.get('Content-Disposition');
       var fnMatch = cd && cd.match(/filename="([^"]+)"/i);
-      var fallback =
-        'inventory-' + code + (($('pm-inv-site-filter') && $('pm-inv-site-filter').value.trim()) ? '-filtered' : '') + '.csv';
+      var fallback = 'inventory-combined-' + code + '.csv';
       a.download = fnMatch ? fnMatch[1] : fallback;
       a.click();
       URL.revokeObjectURL(a.href);
@@ -1808,7 +1695,7 @@
       return;
     api('/auth/admin/hardware-register/' + encodeURIComponent(String(r.id)), { method: 'DELETE' })
       .then(function () {
-        return refreshHardwareRegister();
+        return refreshUnifiedInventory();
       })
       .then(function () {
         return refreshHardwareInventorySummary();
@@ -2284,22 +2171,30 @@
     if (hwBd && !hwBd.classList.contains('hidden')) closeHwRegEditModal();
   });
 
-  var pmInvSel = $('pm-inv-state-select');
-  if (pmInvSel) {
-    pmInvSel.addEventListener('change', function () {
-      if (isPortalAdmin()) refreshPmInventory();
+  var invStateSel = $('inv-state-select');
+  if (invStateSel) {
+    invStateSel.addEventListener('change', function () {
+      refreshUnifiedInventory();
     });
   }
-  var pmInvLoad = $('btn-pm-inv-load');
-  if (pmInvLoad) {
-    pmInvLoad.addEventListener('click', function () {
-      refreshPmInventory();
+  var btnInvLoad = $('btn-inv-load');
+  if (btnInvLoad) {
+    btnInvLoad.addEventListener('click', function () {
+      refreshUnifiedInventory();
     });
   }
-  var pmInvCsv = $('btn-pm-inv-csv');
-  if (pmInvCsv) {
-    pmInvCsv.addEventListener('click', function () {
-      downloadPmInventoryCsv();
+  var btnInvCsv = $('btn-inv-csv');
+  if (btnInvCsv) {
+    btnInvCsv.addEventListener('click', function () {
+      downloadInventoryCombinedCsv();
+    });
+  }
+  var invTextFilter = $('inv-text-filter');
+  if (invTextFilter) {
+    invTextFilter.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      refreshUnifiedInventory();
     });
   }
 
@@ -2334,7 +2229,7 @@
           body: JSON.stringify(body),
         });
         closePmItemEditModal();
-        await refreshPmInventory();
+        await refreshUnifiedInventory();
         await refreshStats();
       } catch (e) {
         show($('pm-item-edit-err'), e.message);
@@ -2375,44 +2270,12 @@
           body: JSON.stringify(body),
         });
         closeHwRegEditModal();
-        await refreshHardwareRegister();
+        await refreshUnifiedInventory();
         await refreshHardwareInventorySummary();
         await refreshStats();
       } catch (e) {
         show($('hw-reg-edit-err'), e.message);
       }
-    });
-  }
-  var hwRegSel = $('hw-reg-state-select');
-  if (hwRegSel) {
-    hwRegSel.addEventListener('change', function () {
-      refreshHardwareRegister();
-    });
-  }
-  var hwRegLoad = $('btn-hw-reg-load');
-  if (hwRegLoad) {
-    hwRegLoad.addEventListener('click', function () {
-      refreshHardwareRegister();
-    });
-  }
-  var hwRegSort = $('hw-reg-sort-select');
-  if (hwRegSort) {
-    hwRegSort.addEventListener('change', function () {
-      refreshHardwareRegister();
-    });
-  }
-  var hwRegDir = $('hw-reg-dir-select');
-  if (hwRegDir) {
-    hwRegDir.addEventListener('change', function () {
-      refreshHardwareRegister();
-    });
-  }
-  var hwRegTextFilter = $('hw-reg-text-filter');
-  if (hwRegTextFilter) {
-    hwRegTextFilter.addEventListener('keydown', function (ev) {
-      if (ev.key !== 'Enter') return;
-      ev.preventDefault();
-      refreshHardwareRegister();
     });
   }
   $('btn-state-clear').addEventListener('click', function () {
