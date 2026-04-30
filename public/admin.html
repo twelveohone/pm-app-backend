@@ -663,122 +663,6 @@
           <div id="site-edit-err" class="err hidden"></div>
         </div>
       </div>
-
-      <div id="pm-item-edit-backdrop" class="modal-backdrop hidden" aria-hidden="true">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pm-item-edit-title">
-          <strong id="pm-item-edit-title">Edit PM item</strong>
-          <p class="hint" id="pm-item-edit-sub" style="margin:.35rem 0 0;font-size:.8rem;"></p>
-          <div class="modal-grid" style="margin-top:.65rem;">
-            <div>
-              <label for="pm-item-device">Device type</label>
-              <input id="pm-item-device" type="text" autocomplete="off" placeholder="e.g. printer" />
-            </div>
-            <div class="modal-inline2">
-              <div>
-                <label for="pm-item-unit-type">Unit type</label>
-                <input id="pm-item-unit-type" type="text" autocomplete="off" />
-              </div>
-              <div>
-                <label for="pm-item-unit-idx">Unit index</label>
-                <input id="pm-item-unit-idx" type="number" min="0" step="1" />
-              </div>
-            </div>
-            <div>
-              <label for="pm-item-serial">Serial</label>
-              <input id="pm-item-serial" type="text" autocomplete="off" />
-            </div>
-            <div>
-              <label for="pm-item-asset">Asset tag</label>
-              <input id="pm-item-asset" type="text" autocomplete="off" />
-            </div>
-            <div>
-              <label for="pm-item-notes">Notes</label>
-              <input id="pm-item-notes" type="text" autocomplete="off" />
-            </div>
-            <div class="modal-inline2">
-              <div>
-                <label for="pm-item-cleaned">Cleaned (0/1)</label>
-                <input id="pm-item-cleaned" type="number" min="0" max="1" step="1" />
-              </div>
-              <div>
-                <label for="pm-item-damaged">Damaged (0/1)</label>
-                <input id="pm-item-damaged" type="number" min="0" max="1" step="1" />
-              </div>
-            </div>
-            <div>
-              <label for="pm-item-pmpod">Printer master pod (0/1 or empty)</label>
-              <input id="pm-item-pmpod" type="text" autocomplete="off" placeholder="empty = null" />
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button type="button" id="pm-item-edit-save">Save</button>
-            <button type="button" class="secondary" id="pm-item-edit-cancel">Cancel</button>
-          </div>
-          <div id="pm-item-edit-err" class="err hidden"></div>
-        </div>
-      </div>
-
-      <div id="hw-reg-edit-backdrop" class="modal-backdrop hidden" aria-hidden="true">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="hw-reg-edit-title">
-          <strong id="hw-reg-edit-title">Edit hardware register row</strong>
-          <p class="hint" id="hw-reg-edit-sub" style="margin:.35rem 0 0;font-size:.8rem;"></p>
-          <div class="modal-grid" style="margin-top:.65rem;">
-            <div>
-              <label for="hw-reg-edit-location">Location</label>
-              <input id="hw-reg-edit-location" type="text" autocomplete="off" />
-            </div>
-            <div class="modal-inline2">
-              <div>
-                <label for="hw-reg-edit-asset">Asset tag</label>
-                <input id="hw-reg-edit-asset" type="text" autocomplete="off" />
-              </div>
-              <div>
-                <label for="hw-reg-edit-serial">Serial</label>
-                <input id="hw-reg-edit-serial" type="text" autocomplete="off" />
-              </div>
-            </div>
-            <div class="modal-inline2">
-              <div>
-                <label for="hw-reg-edit-model">Model</label>
-                <input id="hw-reg-edit-model" type="text" autocomplete="off" />
-              </div>
-              <div>
-                <label for="hw-reg-edit-cat">Category</label>
-                <input id="hw-reg-edit-cat" type="text" autocomplete="off" />
-              </div>
-            </div>
-            <div class="modal-inline2">
-              <div>
-                <label for="hw-reg-edit-state-name">State name (file)</label>
-                <input id="hw-reg-edit-state-name" type="text" autocomplete="off" />
-              </div>
-              <div>
-                <label for="hw-reg-edit-state-code">State code</label>
-                <input id="hw-reg-edit-state-code" type="text" autocomplete="off" placeholder="TN" />
-              </div>
-            </div>
-            <div>
-              <label for="hw-reg-edit-pm-notes">PM notes (synced fields)</label>
-              <input id="hw-reg-edit-pm-notes" type="text" autocomplete="off" />
-            </div>
-            <div class="modal-inline2">
-              <div>
-                <label for="hw-reg-edit-pm-cleaned">PM cleaned (0/1)</label>
-                <input id="hw-reg-edit-pm-cleaned" type="number" min="0" max="1" step="1" />
-              </div>
-              <div>
-                <label for="hw-reg-edit-pm-damaged">PM damaged (0/1)</label>
-                <input id="hw-reg-edit-pm-damaged" type="number" min="0" max="1" step="1" />
-              </div>
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button type="button" id="hw-reg-edit-save">Save</button>
-            <button type="button" class="secondary" id="hw-reg-edit-cancel">Cancel</button>
-          </div>
-          <div id="hw-reg-edit-err" class="err hidden"></div>
-        </div>
-      </div>
     </div>
     </div>
 
@@ -1042,6 +926,122 @@
       <div id="statecfg-form-err" class="err hidden"></div>
       </div>
     </div>
+    </div>
+
+    <div id="pm-item-edit-backdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pm-item-edit-title">
+        <strong id="pm-item-edit-title">Edit PM item</strong>
+        <p class="hint" id="pm-item-edit-sub" style="margin:.35rem 0 0;font-size:.8rem;"></p>
+        <div class="modal-grid" style="margin-top:.65rem;">
+          <div>
+            <label for="pm-item-device">Device type</label>
+            <input id="pm-item-device" type="text" autocomplete="off" placeholder="e.g. printer" />
+          </div>
+          <div class="modal-inline2">
+            <div>
+              <label for="pm-item-unit-type">Unit type</label>
+              <input id="pm-item-unit-type" type="text" autocomplete="off" />
+            </div>
+            <div>
+              <label for="pm-item-unit-idx">Unit index</label>
+              <input id="pm-item-unit-idx" type="number" min="0" step="1" />
+            </div>
+          </div>
+          <div>
+            <label for="pm-item-serial">Serial</label>
+            <input id="pm-item-serial" type="text" autocomplete="off" />
+          </div>
+          <div>
+            <label for="pm-item-asset">Asset tag</label>
+            <input id="pm-item-asset" type="text" autocomplete="off" />
+          </div>
+          <div>
+            <label for="pm-item-notes">Notes</label>
+            <input id="pm-item-notes" type="text" autocomplete="off" />
+          </div>
+          <div class="modal-inline2">
+            <div>
+              <label for="pm-item-cleaned">Cleaned (0/1)</label>
+              <input id="pm-item-cleaned" type="number" min="0" max="1" step="1" />
+            </div>
+            <div>
+              <label for="pm-item-damaged">Damaged (0/1)</label>
+              <input id="pm-item-damaged" type="number" min="0" max="1" step="1" />
+            </div>
+          </div>
+          <div>
+            <label for="pm-item-pmpod">Printer master pod (0/1 or empty)</label>
+            <input id="pm-item-pmpod" type="text" autocomplete="off" placeholder="empty = null" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="pm-item-edit-save">Save</button>
+          <button type="button" class="secondary" id="pm-item-edit-cancel">Cancel</button>
+        </div>
+        <div id="pm-item-edit-err" class="err hidden"></div>
+      </div>
+    </div>
+
+    <div id="hw-reg-edit-backdrop" class="modal-backdrop hidden" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="hw-reg-edit-title">
+        <strong id="hw-reg-edit-title">Edit hardware register row</strong>
+        <p class="hint" id="hw-reg-edit-sub" style="margin:.35rem 0 0;font-size:.8rem;"></p>
+        <div class="modal-grid" style="margin-top:.65rem;">
+          <div>
+            <label for="hw-reg-edit-location">Location</label>
+            <input id="hw-reg-edit-location" type="text" autocomplete="off" />
+          </div>
+          <div class="modal-inline2">
+            <div>
+              <label for="hw-reg-edit-asset">Asset tag</label>
+              <input id="hw-reg-edit-asset" type="text" autocomplete="off" />
+            </div>
+            <div>
+              <label for="hw-reg-edit-serial">Serial</label>
+              <input id="hw-reg-edit-serial" type="text" autocomplete="off" />
+            </div>
+          </div>
+          <div class="modal-inline2">
+            <div>
+              <label for="hw-reg-edit-model">Model</label>
+              <input id="hw-reg-edit-model" type="text" autocomplete="off" />
+            </div>
+            <div>
+              <label for="hw-reg-edit-cat">Category</label>
+              <input id="hw-reg-edit-cat" type="text" autocomplete="off" />
+            </div>
+          </div>
+          <div class="modal-inline2">
+            <div>
+              <label for="hw-reg-edit-state-name">State name (file)</label>
+              <input id="hw-reg-edit-state-name" type="text" autocomplete="off" />
+            </div>
+            <div>
+              <label for="hw-reg-edit-state-code">State code</label>
+              <input id="hw-reg-edit-state-code" type="text" autocomplete="off" placeholder="TN" />
+            </div>
+          </div>
+          <div>
+            <label for="hw-reg-edit-pm-notes">PM notes (synced fields)</label>
+            <input id="hw-reg-edit-pm-notes" type="text" autocomplete="off" />
+          </div>
+          <div class="modal-inline2">
+            <div>
+              <label for="hw-reg-edit-pm-cleaned">PM cleaned (0/1)</label>
+              <input id="hw-reg-edit-pm-cleaned" type="number" min="0" max="1" step="1" />
+            </div>
+            <div>
+              <label for="hw-reg-edit-pm-damaged">PM damaged (0/1)</label>
+              <input id="hw-reg-edit-pm-damaged" type="number" min="0" max="1" step="1" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="hw-reg-edit-save">Save</button>
+          <button type="button" class="secondary" id="hw-reg-edit-cancel">Cancel</button>
+        </div>
+        <div id="hw-reg-edit-err" class="err hidden"></div>
+      </div>
     </div>
   </div>
   </div>
