@@ -345,9 +345,14 @@ async function ensureSitesTable() {
       first_pod_system TEXT,
       first_kiosk_system TEXT,
       created_at TIMESTAMPTZ NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL
+      updated_at TIMESTAMPTZ NOT NULL,
+      is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+      deleted_at TIMESTAMPTZ
     )
   `);
+  // Backfill columns for existing databases created before soft-delete support.
+  await pool.query(`ALTER TABLE sites ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE sites ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ`);
 }
 
 /**
@@ -421,11 +426,11 @@ async function upsertSiteRow(q, site) {
   const created_at = site.created_at ? new Date(site.created_at) : new Date();
   const updated_at = site.updated_at ? new Date(site.updated_at) : new Date();
 
-  await q.query(
+  const result = await q.query(
     `INSERT INTO sites (
       id, station, site_name, address, city, zip, county, region, primary_phone, alt_phones, hours,
-      state, workstations, kiosks, first_pod_system, first_kiosk_system, created_at, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+      state, workstations, kiosks, first_pod_system, first_kiosk_system, created_at, updated_at, is_deleted, deleted_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,FALSE,NULL)
     ON CONFLICT (id) DO UPDATE SET
       station = EXCLUDED.station,
       site_name = EXCLUDED.site_name,
@@ -442,7 +447,8 @@ async function upsertSiteRow(q, site) {
       kiosks = EXCLUDED.kiosks,
       first_pod_system = EXCLUDED.first_pod_system,
       first_kiosk_system = EXCLUDED.first_kiosk_system,
-      updated_at = EXCLUDED.updated_at`,
+      updated_at = EXCLUDED.updated_at
+    WHERE COALESCE(sites.is_deleted, FALSE) = FALSE`,
     [
       id,
       station,
@@ -464,6 +470,7 @@ async function upsertSiteRow(q, site) {
       updated_at,
     ]
   );
+  return result.rowCount > 0;
 }
 
 function authRequired(req, res, next) {
@@ -1687,7 +1694,9 @@ app.delete('/state-configs/:code', authRequired, adminRequired, async (req, res)
 
 app.get('/sites', authRequired, async (req, res) => {
   try {
-    const result = await pool.query(`SELECT * FROM sites ORDER BY site_name ASC`);
+    const result = await pool.query(
+      `SELECT * FROM sites WHERE COALESCE(is_deleted, FALSE) = FALSE ORDER BY site_name ASC`
+    );
     return res.json(result.rows);
   } catch (err) {
     console.error(err);
@@ -1702,8 +1711,17 @@ app.put('/sites/:id', authRequired, async (req, res) => {
   }
   const body = { ...req.body, id };
   try {
-    await upsertSiteRow(pool, body);
-    const row = await pool.query(`SELECT * FROM sites WHERE id = $1`, [id]);
+    const saved = await upsertSiteRow(pool, body);
+    if (!saved) {
+      return res.status(409).json({
+        error:
+          'This site was deleted and cannot be recreated by sync. Re-add it manually as a new site.',
+      });
+    }
+    const row = await pool.query(
+      `SELECT * FROM sites WHERE id = $1 AND COALESCE(is_deleted, FALSE) = FALSE`,
+      [id]
+    );
     return res.json(row.rows[0] || null);
   } catch (err) {
     console.error(err);
@@ -1724,7 +1742,15 @@ app.delete('/sites/:id', authRequired, async (req, res) => {
       [id]
     );
     await client.query(`DELETE FROM pm_sessions WHERE site_id = $1`, [id]);
-    const del = await client.query(`DELETE FROM sites WHERE id = $1`, [id]);
+    const del = await client.query(
+      `UPDATE sites
+       SET is_deleted = TRUE,
+           deleted_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1
+         AND COALESCE(is_deleted, FALSE) = FALSE`,
+      [id]
+    );
     await client.query('COMMIT');
     if (del.rowCount === 0) {
       return res.status(404).json({ error: 'Site not found' });
