@@ -1649,8 +1649,9 @@
         var ser = r.source === 'pm' ? r.serial : r.serial_number;
         var hasDamage = r.source === 'pm' ? !!r.damaged : !!r.pm_damaged;
         var rawNotes = r.source === 'pm' ? String(r.notes || '') : String(r.pm_notes || '');
-        var hasNotes = rawNotes.trim().length > 0;
-        var notes = hasDamage || hasNotes ? escapeHtml(rawNotes) : '';
+        var displayNotes = rawNotes.replace(/^\s*\[[^\]]+\]\s*/g, '').trim();
+        var hasNotes = displayNotes.length > 0;
+        var notes = hasDamage || hasNotes ? escapeHtml(displayNotes) : '';
         tr.innerHTML =
           '<td><code>' + escapeHtml(String(item || '')) + '</code></td>' +
           '<td>' + escapeHtml(String(r.asset_tag || '')) + '</td>' +
