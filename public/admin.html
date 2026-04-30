@@ -859,7 +859,8 @@
     }
   }
 
-  function fillStateSelectFromConfigs(sel) {
+  function fillStateSelectFromConfigs(sel, opts) {
+    var leadingBlank = opts && opts.leadingBlank;
     if (!sel || sel.options.length > 0) return Promise.resolve();
     return fetch('/state-configs')
       .then(function (res) {
@@ -871,6 +872,12 @@
         list.sort(function (a, b) {
           return String(a.code || '').localeCompare(String(b.code || ''));
         });
+        if (leadingBlank) {
+          const blank = document.createElement('option');
+          blank.value = '';
+          blank.textContent = 'Select state…';
+          sel.appendChild(blank);
+        }
         for (const s of list) {
           const o = document.createElement('option');
           o.value = s.code || '';
@@ -883,7 +890,7 @@
 
   async function ensureHardwareRegStateSelect() {
     var sel = $('hw-reg-state-select');
-    await fillStateSelectFromConfigs(sel);
+    await fillStateSelectFromConfigs(sel, { leadingBlank: true });
   }
 
   async function refreshHardwareRegister() {
