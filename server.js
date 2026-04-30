@@ -14,7 +14,18 @@ const REQUIRE_AUTH = String(process.env.REQUIRE_AUTH || 'false').toLowerCase() =
 const ALLOW_SELF_SIGNUP = String(process.env.ALLOW_SELF_SIGNUP || 'true').toLowerCase() === 'true';
 
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(
+  express.static(path.join(__dirname, 'public'), {
+    setHeaders(res, filePath) {
+      const base = path.basename(filePath);
+      if (base === 'admin.html' || base.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+    },
+  })
+);
 
 function attachUserFromToken(req) {
   const raw = req.headers.authorization || '';
