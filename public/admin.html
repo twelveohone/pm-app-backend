@@ -750,11 +750,11 @@
         <table>
           <thead>
             <tr>
-              <th>Site / location</th>
-              <th>State</th>
               <th>Item</th>
-              <th>Serial</th>
               <th>Asset tag</th>
+              <th>Serial</th>
+              <th>State</th>
+              <th>Site / location</th>
               <th>Notes</th>
               <th class="admin-only">Actions</th>
             </tr>
@@ -1518,11 +1518,11 @@
         var hasNotes = rawNotes.trim().length > 0;
         var notes = hasDamage || hasNotes ? escapeHtml(rawNotes) : '';
         tr.innerHTML =
-          '<td>' + escapeHtml(String(where || '')) + '</td>' +
-          '<td><code>' + escapeHtml(String(st || '')) + '</code></td>' +
           '<td><code>' + escapeHtml(String(item || '')) + '</code></td>' +
-          '<td>' + escapeHtml(String(ser || '')) + '</td>' +
           '<td>' + escapeHtml(String(r.asset_tag || '')) + '</td>' +
+          '<td>' + escapeHtml(String(ser || '')) + '</td>' +
+          '<td><code>' + escapeHtml(String(st || '')) + '</code></td>' +
+          '<td>' + escapeHtml(String(where || '')) + '</td>' +
           '<td style="font-size:.82rem;">' + notes + '</td>' +
           adminTd;
         if (isPortalAdmin()) {

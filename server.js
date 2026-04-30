@@ -1308,20 +1308,20 @@ app.get('/auth/admin/inventory-export', authRequired, adminRequired, async (req,
   try {
     const { state, site, rows } = await queryAdminInventory(pool, req.query.state, req.query.site);
     const headers = [
-      'site_name',
+      'device_type',
+      'asset_tag',
+      'serial',
       'resolved_site_state',
+      'site_name',
+      'notes',
       'session_id',
       'session_started_at',
       'technician_name',
       'unit_type',
       'unit_index',
-      'device_type',
       'cleaned',
       'damaged',
-      'serial',
-      'asset_tag',
       'printer_master_pod',
-      'notes',
       'item_updated_at',
       'item_id',
     ];
@@ -1370,11 +1370,11 @@ app.get('/auth/inventory-combined-export', authRequired, async (req, res) => {
     const { state, q, rows } = await queryInventoryCombined(pool, req.query.state, req.query.q);
     const headers = [
       'source',
+      'detail',
+      'asset_tag',
+      'serial',
       'state',
       'site_or_location',
-      'detail',
-      'serial',
-      'asset_tag',
       'meta',
       'row_id',
     ];
