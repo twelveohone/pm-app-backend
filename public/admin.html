@@ -442,6 +442,7 @@
       <strong>Sites</strong>
       <p class="hint" style="margin-top:.35rem;">
         Rows from the <code>sites</code> table. Blank or missing state is grouped under <strong>TN</strong> (same convention as the mobile app).
+        Use <strong>Delete</strong> to remove a site from the database (PM sessions and line items for that site are removed). This matches removal from the mobile app.
       </p>
       <div class="row" style="margin-top:.75rem;">
         <div>
@@ -462,6 +463,7 @@
               <th>WS</th>
               <th>Kiosks</th>
               <th>Site id</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="sites-body"></tbody>
@@ -765,6 +767,27 @@
     if (sel.options.length) sel.selectedIndex = 0;
   }
 
+  async function confirmDeleteSite(siteId, siteName) {
+    if (!siteId) return;
+    var label = siteName ? '"' + siteName + '"' : siteId;
+    if (
+      !window.confirm(
+        'Delete site ' +
+          label +
+          '? All PM sessions and line items for this site will be removed from the database. This cannot be undone.'
+      )
+    )
+      return;
+    try {
+      await api('/sites/' + encodeURIComponent(siteId), { method: 'DELETE' });
+      await refreshSitesList();
+      await refreshStats();
+    } catch (e) {
+      alert(e.message);
+      await refreshSitesList();
+    }
+  }
+
   async function refreshSitesList() {
     var sel = $('sites-state-select');
     var body = $('sites-body');
@@ -805,7 +828,14 @@
           '<td><code>' + escapeHtml(dispState) + '</code></td>' +
           '<td>' + escapeHtml(String(s.workstations != null ? s.workstations : '')) + '</td>' +
           '<td>' + escapeHtml(String(s.kiosks != null ? s.kiosks : '')) + '</td>' +
-          '<td><code style="font-size:.72rem">' + escapeHtml(String(s.id || '')) + '</code></td>';
+          '<td><code style="font-size:.72rem">' + escapeHtml(String(s.id || '')) + '</code></td>' +
+          '<td><div class="act-btns"><button type="button" class="danger btn-site-del">Delete</button></div></td>';
+        var delBtn = tr.querySelector('.btn-site-del');
+        if (delBtn) {
+          delBtn.addEventListener('click', function () {
+            confirmDeleteSite(s.id, s.site_name || '');
+          });
+        }
         body.appendChild(tr);
       }
     } catch (e) {
